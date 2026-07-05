@@ -187,6 +187,29 @@
   #worldSelectOverlay h1, #levelSelectOverlay h1 { font-size: clamp(26px, 6.5vw, 44px); margin: 0 0 6px; }
   #worldSelectOverlay p, #levelSelectOverlay p { font-size: clamp(13px, 3vw, 17px); max-width: 560px; margin: 4px 0 12px; }
 
+  #langToggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+  }
+  .langBtn {
+    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    cursor: pointer;
+  }
+  .langBtn.activeLang {
+    background: rgba(255,255,255,0.92);
+    color: #222;
+    border-color: #fff;
+    font-weight: bold;
+  }
+
   #levelSelectHeader {
     display: flex;
     align-items: center;
@@ -278,8 +301,8 @@
         <div id="score">Score: 0</div>
       </div>
       <div id="quickUnlockBar" style="display:none;">
-        <div id="quickUnlockProgress">Mở khóa nhanh: 0/3</div>
-        <button id="quickUnlockCancelBtn" class="overlayBtn secondary">✕ Hủy</button>
+        <div id="quickUnlockProgress">Quick Unlock: 0/3</div>
+        <button id="quickUnlockCancelBtn" class="overlayBtn secondary">✕ Cancel</button>
       </div>
     </div>
     <div id="overlay">
@@ -287,17 +310,21 @@
       <div id="overlaySubtitle">Score: 0</div>
       <div id="overlayButtons">
         <button id="primaryBtn" class="overlayBtn primary">Retry Level</button>
-        <button id="levelSelectBtn" class="overlayBtn secondary">Chọn Level</button>
+        <button id="levelSelectBtn" class="overlayBtn secondary">Choose Level</button>
       </div>
     </div>
     <div id="worldSelectOverlay" class="active">
+      <div id="langToggle">
+        <button id="langBtnVi" class="langBtn">🇻🇳 VI</button>
+        <button id="langBtnEn" class="langBtn">🇬🇧 EN</button>
+      </div>
       <h1>🏰 Math Kingdom 👾</h1>
-      <p>Chọn thế giới của bạn! Monsters are marching on the castle — solve the math to shoot them down.</p>
+      <p>Choose your world!</p>
       <div id="worldCards"></div>
     </div>
     <div id="levelSelectOverlay">
       <div id="levelSelectHeader">
-        <button id="backToWorldsBtn">← Thế giới</button>
+        <button id="backToWorldsBtn">← Worlds</button>
         <h1 id="levelSelectTitle" style="margin:0;">World</h1>
       </div>
       <div id="levelCards"></div>
@@ -357,47 +384,156 @@
     QUICK_UNLOCK_STREAK_REQUIRED: 3, // consecutive correct sample answers to skip-unlock a world
   };
 
-  // Adaptive difficulty: 3 tiers (easy/medium/hard) layered on top of whatever
-  // the current level allows, driven by the same correct/wrong streak counters
-  // regardless of question kind (arithmetic, multiplication, word problem...).
-  const DIFFICULTY_TIER_COUNT = 3;
+  // =========================================================================
+  // I18N — every user-facing string lives here. Default language: Vietnamese.
+  // =========================================================================
+  const I18N = {
+    vi: {
+      gameTitle: "🏰 Math Kingdom 👾",
+      tagline: "Chọn thế giới của bạn! Quái vật đang tiến về lâu đài — giải toán để bắn hạ chúng.",
+      selectWorldPlaceholder: "Chọn Thế Giới",
+      worldLabel: "Thế giới",
+      levelLabel: "Cấp",
+      waveLabel: "Màn",
+      scoreLabel: "Điểm",
+      play: "Chơi",
+      lockedWorldSub: "Khóa — hoàn thành world trước để mở, hoặc:",
+      quickUnlock: "Mở khóa nhanh ⚡",
+      tapToPlay: "Chạm để chơi",
+      locked: "Khóa",
+      backToWorlds: "← Thế giới",
+      chooseLevel: "Chọn Level",
+      retryLevel: "Chơi lại",
+      nextLevel: "Level tiếp theo",
+      nextWorld: "Thế giới tiếp theo",
+      gameOverTitle: "Thua rồi!",
+      levelCompleteTitle: "Xong Level!",
+      worldCompleteTitle: "Xong Thế giới!",
+      victoryTitle: "Chiến thắng! 🎉",
+      nextUp: "Tiếp theo",
+      savedKingdom: "Bạn đã cứu vương quốc!",
+      correct: "Đúng rồi! 🎯",
+      oopsAnswerWas: "Sai rồi! Đáp án đúng là",
+      niceStreak: "Giỏi quá! Câu khó hơn nhé 🌟",
+      bossDefeated: "Đã hạ gục Trùm! 💥",
+      bossHitLeft: "Trúng Trùm! Còn {hp}/{maxHp} 🛡️",
+      cancel: "✕ Hủy",
+      quickUnlockProgressLabel: "Mở khóa nhanh",
+      correctInARow: "đúng liên tiếp",
+      quickUnlockWrong: "Sai rồi! Đáp án là {ans}. Thử lại nhé!",
+      worlds: {
+        1: "Vương Quốc Cộng Trừ",
+        2: "Vương quốc Phép Nhân",
+        3: "Xứ sở Toán Đố",
+      },
+      ageRanges: { 1: "6-8 tuổi", 2: "8-10 tuổi", 3: "10-12 tuổi" },
+      levels: {
+        "1-1": "Làng", "1-2": "Rừng", "1-3": "Lâu đài Rồng",
+        "2-1": "Chợ Nhân", "2-2": "Xưởng Máy", "2-3": "Tháp Pháp Sư",
+        "3-1": "Làng Kể Chuyện", "3-2": "Chợ Bài Toán", "3-3": "Đền Trí Tuệ",
+      },
+    },
+    en: {
+      gameTitle: "🏰 Math Kingdom 👾",
+      tagline: "Choose your world! Monsters are marching on the castle — solve the math to shoot them down.",
+      selectWorldPlaceholder: "Select a World",
+      worldLabel: "World",
+      levelLabel: "Level",
+      waveLabel: "Wave",
+      scoreLabel: "Score",
+      play: "Play",
+      lockedWorldSub: "Locked — finish the previous world to unlock, or:",
+      quickUnlock: "Quick Unlock ⚡",
+      tapToPlay: "Tap to play",
+      locked: "Locked",
+      backToWorlds: "← Worlds",
+      chooseLevel: "Choose Level",
+      retryLevel: "Retry Level",
+      nextLevel: "Next Level",
+      nextWorld: "Next World",
+      gameOverTitle: "Game Over",
+      levelCompleteTitle: "Level Complete!",
+      worldCompleteTitle: "World Complete!",
+      victoryTitle: "Victory! 🎉",
+      nextUp: "Next up",
+      savedKingdom: "You saved the kingdom!",
+      correct: "Correct! 🎯",
+      oopsAnswerWas: "Oops! Answer was",
+      niceStreak: "Nice streak! Harder questions 🌟",
+      bossDefeated: "Boss defeated! 💥",
+      bossHitLeft: "Boss hit! {hp}/{maxHp} left 🛡️",
+      cancel: "✕ Cancel",
+      quickUnlockProgressLabel: "Quick Unlock",
+      correctInARow: "correct in a row",
+      quickUnlockWrong: "Not quite! The answer was {ans}. Try again!",
+      worlds: {
+        1: "Addition & Subtraction Kingdom",
+        2: "Multiplication Kingdom",
+        3: "Word Problem Land",
+      },
+      ageRanges: { 1: "ages 6-8", 2: "ages 8-10", 3: "ages 10-12" },
+      levels: {
+        "1-1": "Village", "1-2": "Forest", "1-3": "Dragon Castle",
+        "2-1": "Market", "2-2": "Factory", "2-3": "Wizard Tower",
+        "3-1": "Story Village", "3-2": "Word Bazaar", "3-3": "Temple of Wisdom",
+      },
+    },
+  };
+
+  const LANG_KEY = "mathKingdomLang";
+  function loadLang() {
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      if (saved === "vi" || saved === "en") return saved;
+    } catch (e) { /* storage unavailable */ }
+    return "vi";
+  }
+  function saveLang(lang) {
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) { /* storage unavailable */ }
+  }
+  let currentLang = loadLang();
+
+  function t(key) { return I18N[currentLang][key]; }
+  function tf(key, vars) {
+    let s = I18N[currentLang][key];
+    Object.keys(vars).forEach((k) => { s = s.replace(`{${k}}`, vars[k]); });
+    return s;
+  }
+  function worldName(worldId) { return I18N[currentLang].worlds[worldId]; }
+  function levelName(worldId, levelId) { return I18N[currentLang].levels[`${worldId}-${levelId}`]; }
+  function ageRangeText(worldId) { return I18N[currentLang].ageRanges[worldId]; }
 
   // =========================================================================
   // WORLDS — each world is a themed set of 3 levels (level 3 = boss wave).
-  // World 1 covers the original MVP content; Worlds 2-3 extend the age range.
+  // Names/labels are looked up from I18N by id, not stored here, so the
+  // whole game can be relanguaged without touching this structure.
   // =========================================================================
   const WORLDS = [
     {
       id: 1,
-      name: "Vương Quốc Cộng Trừ",
-      ageRange: "6-8 tuổi",
       emoji: "🏰",
       levels: [
-        { id: 1, name: "Làng", emoji: "🏘️", kind: "arithmetic", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 2, name: "Rừng", emoji: "🌲", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 3, name: "Lâu đài Rồng", emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🐲" },
+        { id: 1, emoji: "🏘️", kind: "arithmetic", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 2, emoji: "🌲", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 3, emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🐲" },
       ],
     },
     {
       id: 2,
-      name: "Vương quốc Phép Nhân",
-      ageRange: "8-10 tuổi",
       emoji: "✖️",
       levels: [
-        { id: 1, name: "Chợ Nhân", emoji: "🛒", kind: "multiplication", tables: [2, 3, 4, 5], monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 2, name: "Xưởng Máy", emoji: "⚙️", kind: "multiplication", tables: [6, 7, 8, 9], monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 3, name: "Tháp Pháp Sư", emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🧙" },
+        { id: 1, emoji: "🛒", kind: "multiplication", tables: [2, 3, 4, 5], monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 2, emoji: "⚙️", kind: "multiplication", tables: [6, 7, 8, 9], monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 3, emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🧙" },
       ],
     },
     {
       id: 3,
-      name: "Xứ sở Toán Đố",
-      ageRange: "10-12 tuổi",
       emoji: "📖",
       levels: [
-        { id: 1, name: "Làng Kể Chuyện", emoji: "📗", kind: "wordproblem", opSet: ["+", "-"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
-        { id: 2, name: "Chợ Bài Toán", emoji: "📘", kind: "wordproblem", opSet: ["+", "-", "*"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
-        { id: 3, name: "Đền Trí Tuệ", emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: true, bossEmoji: "🦉" },
+        { id: 1, emoji: "📗", kind: "wordproblem", opSet: ["+", "-"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
+        { id: 2, emoji: "📘", kind: "wordproblem", opSet: ["+", "-", "*"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
+        { id: 3, emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: true, bossEmoji: "🦉" },
       ],
     },
   ];
@@ -409,12 +545,13 @@
   // =========================================================================
   // QUESTION GENERATION — dispatches on level.kind
   // =========================================================================
+  const DIFFICULTY_TIER_COUNT = 3;
   const SUBTRACTION_CHANCE_BY_TIER = [0.3, 0.5, 0.7];
   const MULDIV_DIVISION_CHANCE_BY_TIER = [0.3, 0.5, 0.7];
   const MULTIPLICATION_OPERAND_BAND_BY_TIER = [{ min: 1, max: 5 }, { min: 1, max: 8 }, { min: 1, max: 10 }];
 
-  const NAME_POOL = ["Lan", "Minh", "An", "Hoa", "Nam", "Mai", "Huy", "Linh", "Bình", "Trang", "Long", "Chi"];
-
+  // Word-problem number ranges by tier are shared across languages (only the
+  // phrasing and names differ). Templates are natural-language, not translations.
   const WORD_BANDS = {
     add: [{ min: 5, max: 10 }, { min: 8, max: 20 }, { min: 15, max: 50 }],
     sub: [{ min: 5, max: 10 }, { min: 8, max: 20 }, { min: 15, max: 50 }],
@@ -422,26 +559,56 @@
     div: [{ min: 2, max: 5 }, { min: 2, max: 9 }, { min: 2, max: 12 }],
   };
 
-  const ADD_TEMPLATES = [
+  const NAME_POOL_VI = ["Lan", "Minh", "An", "Hoa", "Nam", "Mai", "Huy", "Linh", "Bình", "Trang", "Long", "Chi"];
+  const ADD_TEMPLATES_VI = [
     (name, a, b) => `${name} có ${a} viên kẹo, được cho thêm ${b} viên. Hỏi ${name} có tất cả bao nhiêu viên kẹo?`,
     (name, a, b) => `Lớp học có ${a} bạn nam và ${b} bạn nữ. Hỏi lớp có tất cả bao nhiêu bạn?`,
     (name, a, b) => `${name} hái được ${a} quả táo buổi sáng và ${b} quả táo buổi chiều. Hỏi ${name} hái được tất cả bao nhiêu quả táo?`,
   ];
-  const SUB_TEMPLATES = [
+  const SUB_TEMPLATES_VI = [
     (name, a, b) => `${name} có ${a} viên kẹo, cho bạn ${b} viên. Hỏi ${name} còn lại mấy viên kẹo?`,
     (name, a, b) => `Trên cây có ${a} con chim, ${b} con bay đi. Hỏi trên cây còn lại mấy con chim?`,
     (name, a, b) => `${name} có ${a} quyển vở, dùng hết ${b} quyển. Hỏi ${name} còn lại mấy quyển vở?`,
   ];
-  const MUL_TEMPLATES = [
+  const MUL_TEMPLATES_VI = [
     (name, a, b) => `${name} có ${a} hộp bút, mỗi hộp có ${b} cái bút. Hỏi ${name} có tất cả bao nhiêu cái bút?`,
     (name, a, b) => `Có ${a} rổ táo, mỗi rổ có ${b} quả. Hỏi có tất cả bao nhiêu quả táo?`,
     (name, a, b) => `${name} xếp ${a} hàng ghế, mỗi hàng có ${b} cái ghế. Hỏi có tất cả bao nhiêu cái ghế?`,
   ];
-  const DIV_TEMPLATES = [
+  const DIV_TEMPLATES_VI = [
     (name, a, b) => `${name} có ${a} viên kẹo, chia đều cho ${b} bạn. Hỏi mỗi bạn được mấy viên kẹo?`,
     (name, a, b) => `Có ${a} quả cam chia đều vào ${b} rổ. Hỏi mỗi rổ có mấy quả cam?`,
     (name, a, b) => `${name} có ${a} cái bánh, xếp đều vào ${b} đĩa. Hỏi mỗi đĩa có mấy cái bánh?`,
   ];
+
+  // English templates are written as natural word problems, not translated
+  // from the Vietnamese set above.
+  const NAME_POOL_EN = ["Emma", "Liam", "Noah", "Olivia", "Ava", "Ethan", "Mia", "Lucas", "Sophia", "Jack", "Isla", "Leo"];
+  const ADD_TEMPLATES_EN = [
+    (name, a, b) => `${name} has ${a} candies. Then ${name} gets ${b} more. How many candies does ${name} have now?`,
+    (name, a, b) => `There are ${a} boys and ${b} girls in the class. How many students are there in total?`,
+    (name, a, b) => `${name} picked ${a} apples in the morning and ${b} apples in the afternoon. How many apples in all?`,
+  ];
+  const SUB_TEMPLATES_EN = [
+    (name, a, b) => `${name} has ${a} candies. ${name} gives ${b} to a friend. How many candies are left?`,
+    (name, a, b) => `There were ${a} birds on a branch. ${b} of them flew away. How many birds are left?`,
+    (name, a, b) => `${name} had ${a} notebooks and used ${b} of them. How many notebooks does ${name} have left?`,
+  ];
+  const MUL_TEMPLATES_EN = [
+    (name, a, b) => `${name} has ${a} boxes of pencils, with ${b} pencils in each box. How many pencils in total?`,
+    (name, a, b) => `There are ${a} baskets of apples, with ${b} apples in each basket. How many apples in total?`,
+    (name, a, b) => `${name} set up ${a} rows of chairs, with ${b} chairs in each row. How many chairs in total?`,
+  ];
+  const DIV_TEMPLATES_EN = [
+    (name, a, b) => `${name} has ${a} candies and shares them equally among ${b} friends. How many candies does each friend get?`,
+    (name, a, b) => `There are ${a} oranges shared equally into ${b} baskets. How many oranges are in each basket?`,
+    (name, a, b) => `${name} has ${a} cookies arranged equally on ${b} plates. How many cookies are on each plate?`,
+  ];
+
+  const WORD_TEMPLATES = {
+    vi: { add: ADD_TEMPLATES_VI, sub: SUB_TEMPLATES_VI, mul: MUL_TEMPLATES_VI, div: DIV_TEMPLATES_VI, names: NAME_POOL_VI },
+    en: { add: ADD_TEMPLATES_EN, sub: SUB_TEMPLATES_EN, mul: MUL_TEMPLATES_EN, div: DIV_TEMPLATES_EN, names: NAME_POOL_EN },
+  };
 
   function pickFrom(arr) {
     return arr[randInt(0, arr.length - 1)];
@@ -449,33 +616,34 @@
 
   function generateWordProblem(levelConfig, tierIndex) {
     const op = pickFrom(levelConfig.opSet);
-    const name = pickFrom(NAME_POOL);
+    const templates = WORD_TEMPLATES[currentLang];
+    const name = pickFrom(templates.names);
     let a, b, answer, text;
     if (op === "+") {
       const band = WORD_BANDS.add[tierIndex];
       a = randInt(band.min, band.max);
       b = randInt(band.min, band.max);
       answer = a + b;
-      text = pickFrom(ADD_TEMPLATES)(name, a, b);
+      text = pickFrom(templates.add)(name, a, b);
     } else if (op === "-") {
       const band = WORD_BANDS.sub[tierIndex];
       a = randInt(band.min, band.max);
       b = randInt(1, a);
       answer = a - b;
-      text = pickFrom(SUB_TEMPLATES)(name, a, b);
+      text = pickFrom(templates.sub)(name, a, b);
     } else if (op === "*") {
       const band = WORD_BANDS.mul[tierIndex];
       a = randInt(band.min, band.max);
       b = randInt(band.min, band.max);
       answer = a * b;
-      text = pickFrom(MUL_TEMPLATES)(name, a, b);
+      text = pickFrom(templates.mul)(name, a, b);
     } else {
       const band = WORD_BANDS.div[tierIndex];
       b = randInt(band.min, band.max);
       const quotient = randInt(band.min, band.max);
       a = b * quotient;
       answer = quotient;
-      text = pickFrom(DIV_TEMPLATES)(name, a, b);
+      text = pickFrom(templates.div)(name, a, b);
     }
     return { isWordProblem: true, text, answer };
   }
@@ -716,7 +884,7 @@
       state.difficultyIndex++;
       state.correctStreak = 0;
       Audio_.tierUp();
-      showFeedback("Nice streak! Harder questions 🌟", "#2b6cb0");
+      showFeedback(t("niceStreak"), "#2b6cb0");
     }
   }
 
@@ -766,7 +934,7 @@
     state.spawnTimer = 0;
     state.waveInProgress = true;
     document.getElementById("waveInfo").textContent =
-      `${world.emoji} Level ${lvl.id}: ${lvl.name} — Wave ${waveNum}/${BALANCE.TOTAL_WAVES}`;
+      `${world.emoji} ${t("levelLabel")} ${lvl.id}: ${levelName(world.id, lvl.id)} — ${t("waveLabel")} ${waveNum}/${BALANCE.TOTAL_WAVES}`;
   }
 
   function spawnMonster() {
@@ -820,7 +988,7 @@
   function hitMonster(m) {
     m.hp--;
     state.score += BALANCE.SCORE_PER_CORRECT;
-    document.getElementById("score").textContent = `Score: ${state.score}`;
+    document.getElementById("score").textContent = `${t("scoreLabel")}: ${state.score}`;
     Audio_.hit();
 
     for (let i = 0; i < 4; i++) {
@@ -838,8 +1006,8 @@
       m.dieTimer = 0;
       if (m.isBoss) {
         state.score += BALANCE.BOSS_KILL_BONUS;
-        document.getElementById("score").textContent = `Score: ${state.score}`;
-        showFeedback("Boss defeated! 💥", "#e8590c");
+        document.getElementById("score").textContent = `${t("scoreLabel")}: ${state.score}`;
+        showFeedback(t("bossDefeated"), "#e8590c");
       }
       for (let i = 0; i < (m.isBoss ? 20 : 8); i++) {
         state.particles.push({
@@ -851,7 +1019,7 @@
         });
       }
     } else if (m.isBoss) {
-      showFeedback(`Boss hit! ${m.hp}/${m.maxHp} left 🛡️`, "#e8590c");
+      showFeedback(tf("bossHitLeft", { hp: m.hp, maxHp: m.maxHp }), "#e8590c");
     }
   }
 
@@ -897,11 +1065,12 @@
     const titleEl = document.getElementById("overlayTitle");
     const subEl = document.getElementById("overlaySubtitle");
     const primaryBtn = document.getElementById("primaryBtn");
+    document.getElementById("levelSelectBtn").textContent = t("chooseLevel");
 
     if (outcome === "gameover") {
-      titleEl.textContent = "Game Over";
-      subEl.textContent = `Score: ${state.score}`;
-      primaryBtn.textContent = "Chơi lại";
+      titleEl.textContent = t("gameOverTitle");
+      subEl.textContent = `${t("scoreLabel")}: ${state.score}`;
+      primaryBtn.textContent = t("retryLevel");
       primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(world.id, lvl.id); };
       Audio_.gameOver();
     } else if (outcome === "levelComplete") {
@@ -911,9 +1080,9 @@
         saveProgress();
       }
       const nextLvl = world.levels[lvl.id];
-      titleEl.textContent = `Level Complete! ${lvl.emoji}`;
-      subEl.textContent = `Score: ${state.score} — Next up: ${nextLvl.name}`;
-      primaryBtn.textContent = "Level tiếp theo";
+      titleEl.textContent = `${t("levelCompleteTitle")} ${lvl.emoji}`;
+      subEl.textContent = `${t("scoreLabel")}: ${state.score} — ${t("nextUp")}: ${levelName(world.id, nextLvl.id)}`;
+      primaryBtn.textContent = t("nextLevel");
       primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(world.id, nextLvl.id); };
       Audio_.victory();
       startConfetti();
@@ -924,14 +1093,14 @@
         const nwp = getWorldProgress(nextWorld.id);
         nwp.unlocked = true;
         saveProgress();
-        titleEl.textContent = `World Complete! ${world.emoji}`;
-        subEl.textContent = `Score: ${state.score} — Next up: ${nextWorld.name}`;
-        primaryBtn.textContent = "Thế giới tiếp theo";
+        titleEl.textContent = `${t("worldCompleteTitle")} ${world.emoji}`;
+        subEl.textContent = `${t("scoreLabel")}: ${state.score} — ${t("nextUp")}: ${worldName(nextWorld.id)}`;
+        primaryBtn.textContent = t("nextWorld");
         primaryBtn.onclick = () => { Audio_.resumeCtx(); showLevelSelect(nextWorld.id); };
       } else {
-        titleEl.textContent = "Victory! 🎉";
-        subEl.textContent = `Score: ${state.score} — You saved the kingdom!`;
-        primaryBtn.textContent = "Chơi lại";
+        titleEl.textContent = t("victoryTitle");
+        subEl.textContent = `${t("scoreLabel")}: ${state.score} — ${t("savedKingdom")}`;
+        primaryBtn.textContent = t("retryLevel");
         primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(world.id, lvl.id); };
       }
       Audio_.victory();
@@ -961,6 +1130,24 @@
   }
 
   // =========================================================================
+  // LANGUAGE TOGGLE
+  // =========================================================================
+  function updateLangToggleUI() {
+    document.getElementById("langBtnVi").classList.toggle("activeLang", currentLang === "vi");
+    document.getElementById("langBtnEn").classList.toggle("activeLang", currentLang === "en");
+  }
+
+  function setLanguage(lang) {
+    if (lang !== "vi" && lang !== "en") return;
+    currentLang = lang;
+    saveLang(lang);
+    showWorldSelect();
+  }
+
+  document.getElementById("langBtnVi").addEventListener("click", () => setLanguage("vi"));
+  document.getElementById("langBtnEn").addEventListener("click", () => setLanguage("en"));
+
+  // =========================================================================
   // WORLD SELECT / LEVEL SELECT SCREENS
   // =========================================================================
   function renderWorldCards() {
@@ -972,22 +1159,22 @@
       card.className = "worldCard" + (wp.unlocked ? "" : " locked");
       card.innerHTML =
         `<div class="worldCardEmoji">${wp.unlocked ? world.emoji : "🔒"}</div>` +
-        `<div class="worldCardTitle">World ${world.id}: ${world.name}</div>` +
-        `<div class="worldCardAge">${world.ageRange}</div>`;
+        `<div class="worldCardTitle">${t("worldLabel")} ${world.id}: ${worldName(world.id)}</div>` +
+        `<div class="worldCardAge">${ageRangeText(world.id)}</div>`;
       if (wp.unlocked) {
         const playBtn = document.createElement("button");
         playBtn.className = "worldActionBtn primary";
-        playBtn.textContent = "Chơi";
+        playBtn.textContent = t("play");
         playBtn.addEventListener("click", () => { Audio_.resumeCtx(); showLevelSelect(world.id); });
         card.appendChild(playBtn);
       } else {
         const sub = document.createElement("div");
         sub.className = "worldCardSub";
-        sub.textContent = "Khóa — hoàn thành world trước để mở, hoặc:";
+        sub.textContent = t("lockedWorldSub");
         card.appendChild(sub);
         const quickBtn = document.createElement("button");
         quickBtn.className = "worldActionBtn secondary";
-        quickBtn.textContent = "Mở khóa nhanh ⚡";
+        quickBtn.textContent = t("quickUnlock");
         quickBtn.addEventListener("click", () => startQuickUnlockQuiz(world.id));
         card.appendChild(quickBtn);
       }
@@ -998,7 +1185,7 @@
   function renderLevelCards(worldId) {
     const world = getWorld(worldId);
     const wp = getWorldProgress(worldId);
-    document.getElementById("levelSelectTitle").textContent = `World ${world.id}: ${world.name}`;
+    document.getElementById("levelSelectTitle").textContent = `${t("worldLabel")} ${world.id}: ${worldName(world.id)}`;
     const container = document.getElementById("levelCards");
     container.innerHTML = "";
     world.levels.forEach((lvl) => {
@@ -1008,8 +1195,8 @@
       btn.disabled = !unlocked;
       btn.innerHTML =
         `<div class="levelCardEmoji">${unlocked ? lvl.emoji : "🔒"}</div>` +
-        `<div class="levelCardTitle">Level ${lvl.id}: ${lvl.name}</div>` +
-        `<div class="levelCardSub">${unlocked ? "Tap to play" : "Locked"}</div>`;
+        `<div class="levelCardTitle">${t("levelLabel")} ${lvl.id}: ${levelName(world.id, lvl.id)}</div>` +
+        `<div class="levelCardSub">${unlocked ? t("tapToPlay") : t("locked")}</div>`;
       if (unlocked) {
         btn.addEventListener("click", () => startLevel(world.id, lvl.id));
       }
@@ -1023,6 +1210,10 @@
     state.inputEnabled = false;
     document.getElementById("overlay").classList.remove("active");
     document.getElementById("levelSelectOverlay").classList.remove("active");
+    document.querySelector("#worldSelectOverlay h1").textContent = t("gameTitle");
+    document.querySelector("#worldSelectOverlay p").textContent = t("tagline");
+    document.getElementById("waveInfo").textContent = t("selectWorldPlaceholder");
+    updateLangToggleUI();
     renderWorldCards();
     document.getElementById("worldSelectOverlay").classList.add("active");
     setBottomPanelEnabled(false);
@@ -1035,6 +1226,7 @@
     state.inputEnabled = false;
     document.getElementById("overlay").classList.remove("active");
     document.getElementById("worldSelectOverlay").classList.remove("active");
+    document.getElementById("backToWorldsBtn").textContent = t("backToWorlds");
     renderLevelCards(worldId);
     document.getElementById("levelSelectOverlay").classList.add("active");
     setBottomPanelEnabled(false);
@@ -1075,6 +1267,7 @@
     document.getElementById("worldSelectOverlay").classList.remove("active");
     document.getElementById("levelSelectOverlay").classList.remove("active");
     document.getElementById("overlay").classList.remove("active");
+    document.getElementById("quickUnlockCancelBtn").textContent = t("cancel");
     setBottomPanelEnabled(true);
     setHudMode("quiz");
     updateQuickUnlockProgress();
@@ -1084,7 +1277,7 @@
   function updateQuickUnlockProgress() {
     const world = getWorld(state.quickUnlockWorldId);
     document.getElementById("quickUnlockProgress").textContent =
-      `Mở khóa nhanh: ${world.name} — ${state.quickUnlockStreak}/${BALANCE.QUICK_UNLOCK_STREAK_REQUIRED} đúng liên tiếp`;
+      `${t("quickUnlockProgressLabel")}: ${worldName(world.id)} — ${state.quickUnlockStreak}/${BALANCE.QUICK_UNLOCK_STREAK_REQUIRED} ${t("correctInARow")}`;
   }
 
   function generateQuizQuestion() {
@@ -1105,7 +1298,7 @@
     if (correct) {
       state.quickUnlockStreak++;
       Audio_.correct();
-      showFeedback("Đúng! 🎯", "#2f9e44");
+      showFeedback(t("correct"), "#2f9e44");
       if (state.quickUnlockStreak >= BALANCE.QUICK_UNLOCK_STREAK_REQUIRED) {
         const wp = getWorldProgress(state.quickUnlockWorldId);
         wp.unlocked = true;
@@ -1122,7 +1315,7 @@
       state.quickUnlockStreak = 0;
       Audio_.wrong();
       const correctAns = state.currentQuestion.answer;
-      showFeedback(`Sai rồi! Đáp án là ${correctAns}. Thử lại nhé!`, "#e03131");
+      showFeedback(tf("quickUnlockWrong", { ans: correctAns }), "#e03131");
       document.getElementById("answerDisplay").textContent = String(correctAns);
       updateQuickUnlockProgress();
       state.waitingForNextQuestion = true;
@@ -1163,13 +1356,13 @@
       fireAtClosestMonster();
       onCorrectAnswer();
       Audio_.correct();
-      showFeedback("Correct! 🎯", "#2f9e44");
+      showFeedback(t("correct"), "#2f9e44");
       newQuestion();
     } else {
       onWrongAnswer();
       Audio_.wrong();
       const correctAns = state.currentQuestion.answer;
-      showFeedback(`Oops! Answer was ${correctAns}`, "#e03131");
+      showFeedback(`${t("oopsAnswerWas")} ${correctAns}`, "#e03131");
       document.getElementById("answerDisplay").textContent = String(correctAns);
       state.waitingForNextQuestion = true;
       setTimeout(() => {
@@ -1319,9 +1512,9 @@
       const bob = Math.sin(Date.now() / 200 + m.bobOffset) * 4;
       let alpha = 1, scale = 1;
       if (m.dying) {
-        const t = m.dieTimer / 300;
-        alpha = 1 - t;
-        scale = 1 + t * 0.5;
+        const t2 = m.dieTimer / 300;
+        alpha = 1 - t2;
+        scale = 1 + t2 * 0.5;
       }
       const renderScale = scale * (m.scale || 1);
       ctx2d.globalAlpha = alpha;
@@ -1415,7 +1608,7 @@
     state.waveInProgress = false;
     state.waitingForNextQuestion = false;
     confetti = [];
-    document.getElementById("score").textContent = "Score: 0";
+    document.getElementById("score").textContent = `${t("scoreLabel")}: 0`;
     updateHeartsDisplay();
     document.getElementById("overlay").classList.remove("active");
     document.getElementById("worldSelectOverlay").classList.remove("active");
