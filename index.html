@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Math Kingdom</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden;
+    background: linear-gradient(#87CEEB, #B0E0E6);
+    font-family: 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
+    touch-action: manipulation;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  #canvasWrapper {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  #canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    pointer-events: none;
+    z-index: 10;
+    gap: 8px;
+  }
+  #hearts, #score, #waveInfo {
+    font-size: clamp(14px, 3.2vw, 24px);
+    font-weight: bold;
+    color: #3b2a1a;
+    text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff;
+    white-space: nowrap;
+  }
+  #bottomPanel {
+    flex: 0 0 auto;
+    background: #fff8e7;
+    border-top: 4px solid #d4a94c;
+    padding: 8px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.2s;
+  }
+  #bottomPanel.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  #question {
+    font-size: clamp(28px, 6vw, 44px);
+    font-weight: bold;
+    color: #4a3728;
+    letter-spacing: 2px;
+  }
+  #feedback {
+    font-size: clamp(18px, 4vw, 26px);
+    font-weight: bold;
+    min-height: 1.4em;
+    transition: opacity 0.2s;
+  }
+  #answerDisplay {
+    font-size: clamp(22px, 5vw, 32px);
+    font-weight: bold;
+    color: #2b6cb0;
+    min-height: 1.2em;
+    border-bottom: 3px solid #2b6cb0;
+    padding: 0 12px;
+    min-width: 60px;
+    text-align: center;
+  }
+  #numpad {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    width: 100%;
+    max-width: 480px;
+  }
+  .numBtn {
+    font-size: clamp(18px, 4vw, 26px);
+    font-weight: bold;
+    padding: 10px 0;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(#ffd166, #f4a825);
+    color: #4a3728;
+    box-shadow: 0 3px 0 #b5791b;
+    cursor: pointer;
+  }
+  .numBtn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #b5791b;
+  }
+  .numBtn.clear { background: linear-gradient(#ff8a80, #e5544a); box-shadow: 0 3px 0 #a13a32; }
+  .numBtn.enter { background: linear-gradient(#8bd17c, #57a349); box-shadow: 0 3px 0 #3d7332; }
+
+  /* Overlays are sized to canvasWrapper only, so they never cover the number pad */
+  #overlay, #startOverlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: white;
+    text-align: center;
+    padding: 16px;
+  }
+  #overlay {
+    background: rgba(0,0,0,0.68);
+    z-index: 20;
+  }
+  #overlay.active { display: flex; }
+  #startOverlay {
+    background: rgba(20,20,40,0.82);
+    z-index: 30;
+  }
+  #startOverlay.active { display: flex; }
+  #overlayTitle {
+    font-size: clamp(30px, 7vw, 56px);
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+  #overlaySubtitle {
+    font-size: clamp(16px, 3.5vw, 22px);
+    margin-bottom: 20px;
+  }
+  #overlayButtons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .overlayBtn {
+    font-size: clamp(18px, 4.2vw, 26px);
+    font-weight: bold;
+    padding: 12px 32px;
+    border-radius: 14px;
+    border: none;
+    color: white;
+    cursor: pointer;
+  }
+  .overlayBtn.primary {
+    background: linear-gradient(#8bd17c, #57a349);
+    box-shadow: 0 5px 0 #3d7332;
+  }
+  .overlayBtn.primary:active { transform: translateY(3px); box-shadow: 0 2px 0 #3d7332; }
+  .overlayBtn.secondary {
+    background: linear-gradient(#74b9ff, #3f8efc);
+    box-shadow: 0 5px 0 #2a5da0;
+  }
+  .overlayBtn.secondary:active { transform: translateY(3px); box-shadow: 0 2px 0 #2a5da0; }
+
+  #startOverlay h1 { font-size: clamp(28px, 7vw, 48px); margin: 0 0 6px; }
+  #startOverlay p { font-size: clamp(14px, 3.2vw, 19px); max-width: 500px; margin: 4px 0 14px; }
+  #levelCards {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 560px;
+  }
+  .levelCard {
+    width: 150px;
+    padding: 16px 10px;
+    border-radius: 16px;
+    border: none;
+    background: linear-gradient(#6dd5ed, #2193b0);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #1a6f85;
+  }
+  .levelCard:active { transform: translateY(3px); box-shadow: 0 1px 0 #1a6f85; }
+  .levelCard.locked {
+    background: linear-gradient(#8a8a8a, #5a5a5a);
+    cursor: not-allowed;
+    box-shadow: 0 4px 0 #333;
+    opacity: 0.75;
+  }
+  .levelCardEmoji { font-size: 36px; }
+  .levelCardTitle { font-weight: bold; font-size: 15px; margin-top: 6px; }
+  .levelCardSub { font-size: 12px; margin-top: 4px; opacity: 0.9; }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <div id="canvasWrapper">
+    <canvas id="canvas"></canvas>
+    <div id="hud">
+      <div id="hearts">❤️❤️❤️</div>
+      <div id="waveInfo">Select a Level</div>
+      <div id="score">Score: 0</div>
+    </div>
+    <div id="overlay">
+      <div id="overlayTitle">Game Over</div>
+      <div id="overlaySubtitle">Score: 0</div>
+      <div id="overlayButtons">
+        <button id="primaryBtn" class="overlayBtn primary">Retry Level</button>
+        <button id="levelSelectBtn" class="overlayBtn secondary">Level Select</button>
+      </div>
+    </div>
+    <div id="startOverlay" class="active">
+      <h1>🏰 Math Kingdom 👾</h1>
+      <p>Monsters are marching on the castle! Solve the math problem to shoot the closest monster.</p>
+      <div id="levelCards"></div>
+    </div>
+  </div>
+  <div id="bottomPanel" class="disabled">
+    <div id="question">7 + 5 = ?</div>
+    <div id="feedback">&nbsp;</div>
+    <div id="answerDisplay">&nbsp;</div>
+    <div id="numpad">
+      <button class="numBtn" data-key="1">1</button>
+      <button class="numBtn" data-key="2">2</button>
+      <button class="numBtn" data-key="3">3</button>
+      <button class="numBtn" data-key="4">4</button>
+      <button class="numBtn" data-key="5">5</button>
+      <button class="numBtn clear" data-key="clear">C</button>
+      <button class="numBtn" data-key="6">6</button>
+      <button class="numBtn" data-key="7">7</button>
+      <button class="numBtn" data-key="8">8</button>
+      <button class="numBtn" data-key="9">9</button>
+      <button class="numBtn" data-key="0">0</button>
+      <button class="numBtn enter" data-key="enter">✓</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // =========================================================================
+  // GAME BALANCE CONSTANTS — tune these to change difficulty/feel
+  // =========================================================================
+  const BALANCE = {
+    TOTAL_HEARTS: 3,              // lives before Game Over
+    TOTAL_WAVES: 5,               // waves to clear per level
+    BASE_MONSTER_SPEED: 0.35,     // px/frame at wave 1 (base, before per-wave scaling)
+    WAVE_SPEED_INCREMENT: 0.07,   // added to monster speed per wave
+    BASE_MONSTERS_PER_WAVE: 4,    // monsters in wave 1
+    MONSTERS_PER_WAVE_INCREMENT: 2, // extra monsters added each subsequent wave
+    BASE_SPAWN_INTERVAL_MS: 2600, // ms between spawns at wave 1
+    SPAWN_INTERVAL_DECREMENT_MS: 250, // spawn gets faster (smaller interval) each wave
+    MIN_SPAWN_INTERVAL_MS: 900,   // floor for spawn interval
+    ARROW_SPEED: 9,               // px/frame for arrow projectile
+    SCORE_PER_CORRECT: 10,        // points per monster kill (or per boss hit)
+    STREAK_UP_THRESHOLD: 5,       // consecutive correct answers to raise difficulty tier
+    STREAK_DOWN_THRESHOLD: 2,     // consecutive wrong answers to lower difficulty tier
+    WRONG_ANSWER_DISPLAY_MS: 1500,// how long the correct answer is shown after a wrong guess
+    MONSTER_EMOJIS: ["👾", "🧟", "🐉", "👹", "🦖"], // cycled per wave
+    CASTLE_X_FRACTION: 0.08,      // castle position as fraction of canvas width from left
+    SPAWN_X_FRACTION: 0.98,       // spawn position as fraction of canvas width from left
+    BOSS_EMOJI: "🐲",             // final-wave boss sprite (level 3 only)
+    BOSS_HP: 3,                   // correct answers needed to defeat the boss
+    BOSS_KILL_BONUS: 30,          // extra score on top of per-hit score when boss dies
+    BOSS_SCALE: 1.7,              // boss render size multiplier vs a regular monster
+    BOSS_SPEED_MULTIPLIER: 0.8,   // boss moves a bit slower than regular monsters despite being tougher
+  };
+
+  // 3 story levels, selectable from the level-select screen. Progress (which
+  // levels are unlocked) is persisted in localStorage — no personal data.
+  const GAME_LEVELS = [
+    { id: 1, name: "Làng", emoji: "🏘️", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
+    { id: 2, name: "Rừng", emoji: "🌲", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
+    { id: 3, name: "Lâu đài Rồng", emoji: "🐉", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true },
+  ];
+
+  // Adaptive difficulty: 3 tiers (easy/medium/hard) layered on top of whatever
+  // the current game level allows. A level that disallows subtraction (Level 1)
+  // never introduces it, regardless of tier.
+  const DIFFICULTY_TIER_COUNT = 3;
+  const SUBTRACTION_CHANCE_BY_TIER = [0.3, 0.5, 0.7];
+
+  function getDifficultyTierConfig(levelConfig, tierIndex) {
+    if (!levelConfig.allowSubtraction) {
+      return { maxSum: levelConfig.maxSum, allowSubtraction: false, subtractionChance: 0 };
+    }
+    return {
+      maxSum: levelConfig.maxSum,
+      allowSubtraction: true,
+      subtractionChance: SUBTRACTION_CHANCE_BY_TIER[tierIndex],
+    };
+  }
+
+  // =========================================================================
+  // PROGRESS PERSISTENCE — localStorage only, gameplay unlock state, no PII
+  // =========================================================================
+  const PROGRESS_KEY = "mathKingdomProgress";
+
+  function loadProgress() {
+    try {
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      if (!raw) return { unlockedLevel: 1 };
+      const parsed = JSON.parse(raw);
+      const unlockedLevel = Math.min(GAME_LEVELS.length, Math.max(1, parseInt(parsed.unlockedLevel, 10) || 1));
+      return { unlockedLevel: unlockedLevel };
+    } catch (e) {
+      return { unlockedLevel: 1 };
+    }
+  }
+
+  function saveProgress(progress) {
+    try {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    } catch (e) { /* storage unavailable, ignore */ }
+  }
+
+  let progress = loadProgress();
+
+  // =========================================================================
+  // AUDIO — simple Web Audio API synthesized sound effects
+  // =========================================================================
+  const Audio_ = (function () {
+    let ctx = null;
+    function getCtx() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC();
+      }
+      return ctx;
+    }
+    function tone(freq, duration, type, startGain, endGain, delay) {
+      try {
+        const c = getCtx();
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = type || "sine";
+        osc.frequency.setValueAtTime(freq, c.currentTime + (delay || 0));
+        gain.gain.setValueAtTime(startGain != null ? startGain : 0.2, c.currentTime + (delay || 0));
+        gain.gain.exponentialRampToValueAtTime(
+          Math.max(endGain != null ? endGain : 0.001, 0.001),
+          c.currentTime + (delay || 0) + duration
+        );
+        osc.connect(gain);
+        gain.connect(c.destination);
+        osc.start(c.currentTime + (delay || 0));
+        osc.stop(c.currentTime + (delay || 0) + duration);
+      } catch (e) { /* audio not available, ignore */ }
+    }
+    return {
+      shoot: function () { tone(880, 0.12, "square", 0.15, 0.001, 0); tone(1200, 0.08, "square", 0.1, 0.001, 0.03); },
+      hit: function () { tone(220, 0.15, "sawtooth", 0.2, 0.001, 0); tone(150, 0.2, "sawtooth", 0.15, 0.001, 0.05); },
+      wrong: function () { tone(180, 0.25, "sine", 0.18, 0.001, 0); },
+      correct: function () { tone(660, 0.1, "sine", 0.15, 0.001, 0); tone(880, 0.12, "sine", 0.15, 0.001, 0.08); },
+      heartLost: function () { tone(140, 0.3, "sawtooth", 0.25, 0.001, 0); tone(100, 0.35, "sawtooth", 0.2, 0.001, 0.1); },
+      tierUp: function () { tone(523, 0.1, "sine", 0.15, 0.001, 0); tone(659, 0.1, "sine", 0.15, 0.001, 0.1); tone(784, 0.15, "sine", 0.15, 0.001, 0.2); },
+      victory: function () {
+        [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, "sine", 0.2, 0.001, i * 0.15));
+      },
+      gameOver: function () {
+        [400, 350, 300, 200].forEach((f, i) => tone(f, 0.3, "sawtooth", 0.2, 0.001, i * 0.2));
+      },
+      resumeCtx: function () {
+        try {
+          const c = getCtx();
+          if (c.state === "suspended") c.resume();
+        } catch (e) {}
+      }
+    };
+  })();
+
+  // =========================================================================
+  // CANVAS SETUP
+  // =========================================================================
+  const canvas = document.getElementById("canvas");
+  const ctx2d = canvas.getContext("2d");
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
+    ctx2d.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  }
+
+  // =========================================================================
+  // GAME STATE
+  // =========================================================================
+  let state = {
+    gameLevelIndex: 0,
+    hearts: BALANCE.TOTAL_HEARTS,
+    score: 0,
+    wave: 1,
+    monstersRemainingToSpawn: 0,
+    monstersAliveOrPending: 0,
+    monsters: [],
+    arrows: [],
+    particles: [],
+    difficultyIndex: 0,
+    correctStreak: 0,
+    wrongStreak: 0,
+    currentAnswer: "",
+    currentQuestion: null,
+    running: false,
+    spawnTimer: 0,
+    spawnIntervalMs: BALANCE.BASE_SPAWN_INTERVAL_MS,
+    lastFrameTime: 0,
+    waveInProgress: false,
+    waitingForNextQuestion: false,
+    gameEnded: false,
+    isBossWave: false,
+  };
+
+  // =========================================================================
+  // MATH QUESTION GENERATION
+  // =========================================================================
+  function generateQuestion() {
+    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    const tier = getDifficultyTierConfig(lvl, state.difficultyIndex);
+    let a, b, op, answer;
+    const doSubtraction = tier.allowSubtraction && Math.random() < tier.subtractionChance;
+
+    if (doSubtraction) {
+      a = randInt(2, tier.maxSum);
+      b = randInt(1, a); // ensure non-negative result
+      op = "-";
+      answer = a - b;
+    } else {
+      const maxA = tier.maxSum;
+      a = randInt(0, maxA);
+      b = randInt(0, maxA - a);
+      // avoid trivial 0+0
+      if (a === 0 && b === 0) { a = randInt(1, maxA); }
+      op = "+";
+      answer = a + b;
+    }
+    return { a, b, op, answer };
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function newQuestion() {
+    state.currentQuestion = generateQuestion();
+    state.currentAnswer = "";
+    updateQuestionDisplay();
+  }
+
+  function updateQuestionDisplay() {
+    const q = state.currentQuestion;
+    document.getElementById("question").textContent = `${q.a} ${q.op} ${q.b} = ?`;
+    document.getElementById("answerDisplay").textContent = state.currentAnswer || " ";
+  }
+
+  // =========================================================================
+  // DIFFICULTY ADAPTATION (adaptive tier within the current game level)
+  // =========================================================================
+  function onCorrectAnswer() {
+    state.correctStreak++;
+    state.wrongStreak = 0;
+    if (state.correctStreak >= BALANCE.STREAK_UP_THRESHOLD && state.difficultyIndex < DIFFICULTY_TIER_COUNT - 1) {
+      state.difficultyIndex++;
+      state.correctStreak = 0;
+      Audio_.tierUp();
+      showFeedback("Nice streak! Harder questions 🌟", "#2b6cb0");
+    }
+  }
+
+  function onWrongAnswer() {
+    state.wrongStreak++;
+    state.correctStreak = 0;
+    if (state.wrongStreak >= BALANCE.STREAK_DOWN_THRESHOLD && state.difficultyIndex > 0) {
+      state.difficultyIndex--;
+      state.wrongStreak = 0;
+    }
+  }
+
+  function showFeedback(text, color) {
+    const el = document.getElementById("feedback");
+    el.textContent = text;
+    el.style.color = color || "#333";
+    clearTimeout(showFeedback._t);
+    showFeedback._t = setTimeout(() => { el.textContent = " "; }, 1200);
+  }
+
+  // =========================================================================
+  // MONSTER / WAVE MANAGEMENT
+  // =========================================================================
+  function monstersInWave(wave) {
+    return BALANCE.BASE_MONSTERS_PER_WAVE + (wave - 1) * BALANCE.MONSTERS_PER_WAVE_INCREMENT;
+  }
+  function speedForWave(wave) {
+    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    return (BALANCE.BASE_MONSTER_SPEED + (wave - 1) * BALANCE.WAVE_SPEED_INCREMENT) * lvl.monsterSpeedMultiplier;
+  }
+  function spawnIntervalForWave(wave) {
+    return Math.max(
+      BALANCE.MIN_SPAWN_INTERVAL_MS,
+      BALANCE.BASE_SPAWN_INTERVAL_MS - (wave - 1) * BALANCE.SPAWN_INTERVAL_DECREMENT_MS
+    );
+  }
+
+  function startWave(waveNum) {
+    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    state.wave = waveNum;
+    const regularCount = monstersInWave(waveNum);
+    state.isBossWave = !!(lvl.hasBoss && waveNum === BALANCE.TOTAL_WAVES);
+    state.monstersRemainingToSpawn = regularCount + (state.isBossWave ? 1 : 0);
+    state.monstersAliveOrPending = state.monstersRemainingToSpawn;
+    state.spawnIntervalMs = spawnIntervalForWave(waveNum);
+    state.spawnTimer = 0;
+    state.waveInProgress = true;
+    document.getElementById("waveInfo").textContent =
+      `Level ${lvl.id}: ${lvl.name} — Wave ${waveNum}/${BALANCE.TOTAL_WAVES}`;
+  }
+
+  function spawnMonster() {
+    const rect = canvas.getBoundingClientRect();
+    const isBoss = state.isBossWave && state.monstersRemainingToSpawn === 1;
+    const laneY = rect.height * (0.25 + Math.random() * 0.5);
+    state.monsters.push({
+      x: rect.width * BALANCE.SPAWN_X_FRACTION,
+      y: isBoss ? rect.height * 0.5 : laneY,
+      emoji: isBoss ? BALANCE.BOSS_EMOJI : BALANCE.MONSTER_EMOJIS[(state.wave - 1) % BALANCE.MONSTER_EMOJIS.length],
+      speed: speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : 1),
+      hp: isBoss ? BALANCE.BOSS_HP : 1,
+      maxHp: isBoss ? BALANCE.BOSS_HP : 1,
+      isBoss: isBoss,
+      scale: isBoss ? BALANCE.BOSS_SCALE : 1,
+      dying: false,
+      dieTimer: 0,
+      bobOffset: Math.random() * Math.PI * 2,
+    });
+    state.monstersRemainingToSpawn--;
+  }
+
+  function castleX() {
+    return canvas.getBoundingClientRect().width * BALANCE.CASTLE_X_FRACTION;
+  }
+
+  // =========================================================================
+  // SHOOTING
+  // =========================================================================
+  function fireAtClosestMonster() {
+    const alive = state.monsters.filter(m => !m.dying);
+    if (alive.length === 0) return false;
+    let closest = alive[0];
+    for (const m of alive) {
+      if (m.x < closest.x) closest = m;
+    }
+    const rect = canvas.getBoundingClientRect();
+    state.arrows.push({
+      x: rect.width * BALANCE.CASTLE_X_FRACTION + 30,
+      y: rect.height * 0.5,
+      target: closest,
+    });
+    Audio_.shoot();
+    return true;
+  }
+
+  // An arrow hitting its target: regular monsters die in one hit, the boss
+  // takes BALANCE.BOSS_HP hits before dying.
+  function hitMonster(m) {
+    m.hp--;
+    state.score += BALANCE.SCORE_PER_CORRECT;
+    document.getElementById("score").textContent = `Score: ${state.score}`;
+    Audio_.hit();
+
+    for (let i = 0; i < 4; i++) {
+      state.particles.push({
+        x: m.x, y: m.y,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4 - 1,
+        life: 30,
+        color: `hsl(${Math.random() * 60 + 30}, 90%, 60%)`,
+      });
+    }
+
+    if (m.hp <= 0) {
+      m.dying = true;
+      m.dieTimer = 0;
+      if (m.isBoss) {
+        state.score += BALANCE.BOSS_KILL_BONUS;
+        document.getElementById("score").textContent = `Score: ${state.score}`;
+        showFeedback("Boss defeated! 🐉💥", "#e8590c");
+      }
+      for (let i = 0; i < (m.isBoss ? 20 : 8); i++) {
+        state.particles.push({
+          x: m.x, y: m.y,
+          vx: (Math.random() - 0.5) * 5,
+          vy: (Math.random() - 0.5) * 5 - 1,
+          life: 34,
+          color: `hsl(${Math.random() * 60 + 30}, 90%, 60%)`,
+        });
+      }
+    } else if (m.isBoss) {
+      showFeedback(`Boss hit! ${m.hp}/${m.maxHp} left 🛡️`, "#e8590c");
+    }
+  }
+
+  // =========================================================================
+  // HEARTS / GAME END
+  // =========================================================================
+  function loseHeart() {
+    state.hearts--;
+    updateHeartsDisplay();
+    Audio_.heartLost();
+    if (state.hearts <= 0) {
+      endGame("gameover");
+    }
+  }
+
+  function updateHeartsDisplay() {
+    let s = "";
+    for (let i = 0; i < BALANCE.TOTAL_HEARTS; i++) {
+      s += i < state.hearts ? "❤️" : "🖤";
+    }
+    document.getElementById("hearts").textContent = s;
+  }
+
+  function setBottomPanelEnabled(enabled) {
+    document.getElementById("bottomPanel").classList.toggle("disabled", !enabled);
+  }
+
+  // outcome: "gameover" | "levelComplete" | "victory"
+  function endGame(outcome) {
+    if (state.gameEnded) return;
+    state.gameEnded = true;
+    state.running = false;
+    setBottomPanelEnabled(false);
+
+    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    const titleEl = document.getElementById("overlayTitle");
+    const subEl = document.getElementById("overlaySubtitle");
+    const primaryBtn = document.getElementById("primaryBtn");
+
+    if (outcome === "gameover") {
+      titleEl.textContent = "Game Over";
+      subEl.textContent = `Score: ${state.score}`;
+      primaryBtn.textContent = "Retry Level";
+      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(lvl.id); };
+      Audio_.gameOver();
+    } else if (outcome === "levelComplete") {
+      if (progress.unlockedLevel <= lvl.id && lvl.id < GAME_LEVELS.length) {
+        progress.unlockedLevel = lvl.id + 1;
+        saveProgress(progress);
+      }
+      const nextLvl = GAME_LEVELS[lvl.id];
+      titleEl.textContent = `Level Complete! ${lvl.emoji}`;
+      subEl.textContent = `Score: ${state.score} — Next up: ${nextLvl.name}`;
+      primaryBtn.textContent = "Next Level";
+      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(nextLvl.id); };
+      Audio_.victory();
+      startConfetti();
+    } else if (outcome === "victory") {
+      titleEl.textContent = "Victory! 🎉";
+      subEl.textContent = `Score: ${state.score} — You saved the kingdom!`;
+      primaryBtn.textContent = "Play Again";
+      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(lvl.id); };
+      Audio_.victory();
+      startConfetti();
+    }
+
+    document.getElementById("overlay").classList.add("active");
+  }
+
+  // Confetti particles for victory (canvas-drawn, separate lightweight system)
+  let confetti = [];
+  function startConfetti() {
+    confetti = [];
+    const rect = canvas.getBoundingClientRect();
+    for (let i = 0; i < 80; i++) {
+      confetti.push({
+        x: Math.random() * rect.width,
+        y: -20 - Math.random() * rect.height,
+        vy: 2 + Math.random() * 3,
+        vx: (Math.random() - 0.5) * 2,
+        color: `hsl(${Math.random() * 360}, 85%, 60%)`,
+        size: 4 + Math.random() * 6,
+        rot: Math.random() * Math.PI * 2,
+        vrot: (Math.random() - 0.5) * 0.2,
+      });
+    }
+  }
+
+  // =========================================================================
+  // LEVEL SELECT SCREEN
+  // =========================================================================
+  function renderLevelCards() {
+    const container = document.getElementById("levelCards");
+    container.innerHTML = "";
+    GAME_LEVELS.forEach((lvl) => {
+      const unlocked = lvl.id <= progress.unlockedLevel;
+      const btn = document.createElement("button");
+      btn.className = "levelCard" + (unlocked ? "" : " locked");
+      btn.disabled = !unlocked;
+      btn.innerHTML =
+        `<div class="levelCardEmoji">${unlocked ? lvl.emoji : "🔒"}</div>` +
+        `<div class="levelCardTitle">Level ${lvl.id}: ${lvl.name}</div>` +
+        `<div class="levelCardSub">${unlocked ? "Tap to play" : "Locked"}</div>`;
+      if (unlocked) {
+        btn.addEventListener("click", () => startLevel(lvl.id));
+      }
+      container.appendChild(btn);
+    });
+  }
+
+  function showLevelSelect() {
+    state.running = false;
+    document.getElementById("overlay").classList.remove("active");
+    renderLevelCards();
+    document.getElementById("startOverlay").classList.add("active");
+    setBottomPanelEnabled(false);
+  }
+
+  document.getElementById("levelSelectBtn").addEventListener("click", () => {
+    Audio_.resumeCtx();
+    showLevelSelect();
+  });
+
+  function startLevel(levelId) {
+    Audio_.resumeCtx();
+    state.gameLevelIndex = levelId - 1;
+    document.getElementById("startOverlay").classList.remove("active");
+    resetState();
+  }
+
+  // =========================================================================
+  // INPUT HANDLING
+  // =========================================================================
+  function handleKey(key) {
+    if (!state.running || state.waitingForNextQuestion) return;
+    if (key === "clear") {
+      state.currentAnswer = "";
+    } else if (key === "enter") {
+      submitAnswer();
+      return;
+    } else {
+      if (state.currentAnswer.length < 3) {
+        state.currentAnswer += key;
+      }
+    }
+    updateQuestionDisplay();
+  }
+
+  function submitAnswer() {
+    if (state.currentAnswer === "") return;
+    const userVal = parseInt(state.currentAnswer, 10);
+    const correct = userVal === state.currentQuestion.answer;
+    if (correct) {
+      fireAtClosestMonster();
+      onCorrectAnswer();
+      Audio_.correct();
+      showFeedback("Correct! 🎯", "#2f9e44");
+      newQuestion();
+    } else {
+      onWrongAnswer();
+      Audio_.wrong();
+      const correctAns = state.currentQuestion.answer;
+      showFeedback(`Oops! Answer was ${correctAns}`, "#e03131");
+      document.getElementById("answerDisplay").textContent = String(correctAns);
+      state.waitingForNextQuestion = true;
+      setTimeout(() => {
+        state.waitingForNextQuestion = false;
+        newQuestion();
+      }, BALANCE.WRONG_ANSWER_DISPLAY_MS);
+    }
+  }
+
+  document.getElementById("numpad").addEventListener("click", (e) => {
+    const btn = e.target.closest(".numBtn");
+    if (!btn) return;
+    Audio_.resumeCtx();
+    handleKey(btn.dataset.key);
+  });
+
+  window.addEventListener("keydown", (e) => {
+    Audio_.resumeCtx();
+    if (e.key >= "0" && e.key <= "9") {
+      handleKey(e.key);
+    } else if (e.key === "Enter") {
+      handleKey("enter");
+    } else if (e.key === "Backspace" || e.key === "Escape") {
+      handleKey("clear");
+    }
+  });
+
+  // =========================================================================
+  // MAIN UPDATE / RENDER LOOP
+  // =========================================================================
+  function update(dt) {
+    // spawning
+    if (state.waveInProgress && state.monstersRemainingToSpawn > 0) {
+      state.spawnTimer += dt;
+      if (state.spawnTimer >= state.spawnIntervalMs) {
+        state.spawnTimer = 0;
+        spawnMonster();
+      }
+    }
+
+    // monsters
+    const cx = castleX();
+    for (let i = state.monsters.length - 1; i >= 0; i--) {
+      const m = state.monsters[i];
+      if (m.dying) {
+        m.dieTimer += dt;
+        if (m.dieTimer > 300) {
+          state.monsters.splice(i, 1);
+          state.monstersAliveOrPending--;
+        }
+        continue;
+      }
+      m.x -= m.speed * (dt / 16.6667);
+      if (m.x <= cx + 20) {
+        state.monsters.splice(i, 1);
+        state.monstersAliveOrPending--;
+        loseHeart();
+      }
+    }
+
+    // arrows
+    for (let i = state.arrows.length - 1; i >= 0; i--) {
+      const arrow = state.arrows[i];
+      if (arrow.target.dying || !state.monsters.includes(arrow.target)) {
+        state.arrows.splice(i, 1);
+        continue;
+      }
+      const dx = arrow.target.x - arrow.x;
+      const dy = arrow.target.y - arrow.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 15) {
+        hitMonster(arrow.target);
+        state.arrows.splice(i, 1);
+      } else {
+        const speed = BALANCE.ARROW_SPEED * (dt / 16.6667);
+        arrow.x += (dx / dist) * speed;
+        arrow.y += (dy / dist) * speed;
+      }
+    }
+
+    // particles
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
+      if (p.life <= 0) state.particles.splice(i, 1);
+    }
+
+    // confetti
+    if (confetti.length > 0) {
+      const rect = canvas.getBoundingClientRect();
+      for (const c of confetti) {
+        c.y += c.vy * (dt / 16.6667);
+        c.x += c.vx * (dt / 16.6667);
+        c.rot += c.vrot;
+        if (c.y > rect.height + 20) {
+          c.y = -20;
+          c.x = Math.random() * rect.width;
+        }
+      }
+    }
+
+    // wave completion check
+    if (!state.gameEnded && state.waveInProgress && state.monstersRemainingToSpawn <= 0 && state.monstersAliveOrPending <= 0) {
+      state.waveInProgress = false;
+      if (state.wave >= BALANCE.TOTAL_WAVES) {
+        const lvl = GAME_LEVELS[state.gameLevelIndex];
+        if (lvl.id < GAME_LEVELS.length) {
+          endGame("levelComplete");
+        } else {
+          endGame("victory");
+        }
+      } else {
+        setTimeout(() => {
+          if (!state.gameEnded) startWave(state.wave + 1);
+        }, 1500);
+      }
+    }
+  }
+
+  function render() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    ctx2d.clearRect(0, 0, w, h);
+
+    // background ground
+    const grad = ctx2d.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "#bfe6f5");
+    grad.addColorStop(1, "#d9f2c4");
+    ctx2d.fillStyle = grad;
+    ctx2d.fillRect(0, 0, w, h);
+
+    // ground strip
+    ctx2d.fillStyle = "#8fbf5f";
+    ctx2d.fillRect(0, h * 0.75, w, h * 0.25);
+
+    // castle
+    const cx = castleX();
+    ctx2d.font = `${Math.min(80, h * 0.35)}px serif`;
+    ctx2d.textAlign = "center";
+    ctx2d.textBaseline = "middle";
+    ctx2d.fillText("🏰", cx, h * 0.5);
+
+    // monsters
+    for (const m of state.monsters) {
+      ctx2d.save();
+      const bob = Math.sin(Date.now() / 200 + m.bobOffset) * 4;
+      let alpha = 1, scale = 1;
+      if (m.dying) {
+        const t = m.dieTimer / 300;
+        alpha = 1 - t;
+        scale = 1 + t * 0.5;
+      }
+      const renderScale = scale * (m.scale || 1);
+      ctx2d.globalAlpha = alpha;
+      ctx2d.font = `${40 * renderScale}px serif`;
+      ctx2d.textAlign = "center";
+      ctx2d.textBaseline = "middle";
+      ctx2d.fillText(m.emoji, m.x, m.y + bob);
+      if (m.isBoss && !m.dying) {
+        ctx2d.font = "16px sans-serif";
+        ctx2d.fillStyle = "#e8590c";
+        ctx2d.fillText(`❤ ${m.hp}/${m.maxHp}`, m.x, m.y + bob - 20 * renderScale - 8);
+      }
+      ctx2d.restore();
+    }
+
+    // arrows
+    ctx2d.save();
+    ctx2d.font = "24px serif";
+    ctx2d.textAlign = "center";
+    ctx2d.textBaseline = "middle";
+    for (const a of state.arrows) {
+      const angle = Math.atan2(a.target.y - a.y, a.target.x - a.x);
+      ctx2d.save();
+      ctx2d.translate(a.x, a.y);
+      ctx2d.rotate(angle);
+      ctx2d.fillText("➤", 0, 0);
+      ctx2d.restore();
+    }
+    ctx2d.restore();
+
+    // particles
+    for (const p of state.particles) {
+      ctx2d.globalAlpha = Math.max(0, p.life / 30);
+      ctx2d.fillStyle = p.color;
+      ctx2d.beginPath();
+      ctx2d.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx2d.fill();
+    }
+    ctx2d.globalAlpha = 1;
+
+    // confetti
+    for (const c of confetti) {
+      ctx2d.save();
+      ctx2d.translate(c.x, c.y);
+      ctx2d.rotate(c.rot);
+      ctx2d.fillStyle = c.color;
+      ctx2d.fillRect(-c.size / 2, -c.size / 2, c.size, c.size);
+      ctx2d.restore();
+    }
+  }
+
+  function loop(timestamp) {
+    if (!state.lastFrameTime) state.lastFrameTime = timestamp;
+    const dt = timestamp - state.lastFrameTime;
+    state.lastFrameTime = timestamp;
+
+    if (state.running) {
+      update(dt);
+    }
+    if (confetti.length > 0 && !state.running) {
+      // keep animating confetti after game ends
+      const rect = canvas.getBoundingClientRect();
+      for (const c of confetti) {
+        c.y += c.vy * (dt / 16.6667);
+        c.x += c.vx * (dt / 16.6667);
+        c.rot += c.vrot;
+        if (c.y > rect.height + 20) { c.y = -20; c.x = Math.random() * rect.width; }
+      }
+    }
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // =========================================================================
+  // GAME LIFECYCLE
+  // =========================================================================
+  function resetState() {
+    state.hearts = BALANCE.TOTAL_HEARTS;
+    state.score = 0;
+    state.wave = 1;
+    state.monsters = [];
+    state.arrows = [];
+    state.particles = [];
+    state.difficultyIndex = 0;
+    state.correctStreak = 0;
+    state.wrongStreak = 0;
+    state.currentAnswer = "";
+    state.running = true;
+    state.gameEnded = false;
+    state.waveInProgress = false;
+    state.waitingForNextQuestion = false;
+    confetti = [];
+    document.getElementById("score").textContent = "Score: 0";
+    updateHeartsDisplay();
+    document.getElementById("overlay").classList.remove("active");
+    document.getElementById("startOverlay").classList.remove("active");
+    setBottomPanelEnabled(true);
+    newQuestion();
+    startWave(1);
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+  updateHeartsDisplay();
+  showLevelSelect();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
