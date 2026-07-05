@@ -34,20 +34,28 @@
   #hud {
     position: absolute;
     top: 0; left: 0; right: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     padding: 10px 16px;
     pointer-events: none;
     z-index: 10;
-    gap: 8px;
   }
-  #hearts, #score, #waveInfo {
-    font-size: clamp(14px, 3.2vw, 24px);
+  #hudNormal, #quickUnlockBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  #hearts, #score, #waveInfo, #quickUnlockProgress {
+    font-size: clamp(13px, 3vw, 22px);
     font-weight: bold;
     color: #3b2a1a;
     text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff;
     white-space: nowrap;
+  }
+  #quickUnlockCancelBtn {
+    pointer-events: auto;
+    padding: 6px 14px;
+    font-size: 14px;
   }
   #bottomPanel {
     flex: 0 0 auto;
@@ -69,6 +77,13 @@
     font-weight: bold;
     color: #4a3728;
     letter-spacing: 2px;
+  }
+  #question.wordProblemText {
+    font-size: clamp(14px, 2.8vw, 21px);
+    letter-spacing: normal;
+    line-height: 1.35;
+    max-width: 620px;
+    font-weight: bold;
   }
   #feedback {
     font-size: clamp(18px, 4vw, 26px);
@@ -112,7 +127,7 @@
   .numBtn.enter { background: linear-gradient(#8bd17c, #57a349); box-shadow: 0 3px 0 #3d7332; }
 
   /* Overlays are sized to canvasWrapper only, so they never cover the number pad */
-  #overlay, #startOverlay {
+  #overlay, #worldSelectOverlay, #levelSelectOverlay {
     position: absolute;
     inset: 0;
     display: none;
@@ -122,17 +137,18 @@
     color: white;
     text-align: center;
     padding: 16px;
+    overflow-y: auto;
   }
   #overlay {
     background: rgba(0,0,0,0.68);
     z-index: 20;
   }
   #overlay.active { display: flex; }
-  #startOverlay {
+  #worldSelectOverlay, #levelSelectOverlay {
     background: rgba(20,20,40,0.82);
     z-index: 30;
   }
-  #startOverlay.active { display: flex; }
+  #worldSelectOverlay.active, #levelSelectOverlay.active { display: flex; }
   #overlayTitle {
     font-size: clamp(30px, 7vw, 56px);
     font-weight: bold;
@@ -168,15 +184,67 @@
   }
   .overlayBtn.secondary:active { transform: translateY(3px); box-shadow: 0 2px 0 #2a5da0; }
 
-  #startOverlay h1 { font-size: clamp(28px, 7vw, 48px); margin: 0 0 6px; }
-  #startOverlay p { font-size: clamp(14px, 3.2vw, 19px); max-width: 500px; margin: 4px 0 14px; }
-  #levelCards {
+  #worldSelectOverlay h1, #levelSelectOverlay h1 { font-size: clamp(26px, 6.5vw, 44px); margin: 0 0 6px; }
+  #worldSelectOverlay p, #levelSelectOverlay p { font-size: clamp(13px, 3vw, 17px); max-width: 560px; margin: 4px 0 12px; }
+
+  #levelSelectHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  #backToWorldsBtn {
+    font-size: clamp(13px, 3vw, 16px);
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    cursor: pointer;
+  }
+
+  #worldCards, #levelCards {
     display: flex;
     gap: 14px;
     flex-wrap: wrap;
     justify-content: center;
-    max-width: 560px;
+    max-width: 640px;
   }
+  .worldCard {
+    width: 175px;
+    padding: 16px 12px;
+    border-radius: 16px;
+    background: linear-gradient(#6dd5ed, #2193b0);
+    box-shadow: 0 4px 0 #1a6f85;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .worldCard.locked {
+    background: linear-gradient(#8a8a8a, #5a5a5a);
+    box-shadow: 0 4px 0 #333;
+    opacity: 0.9;
+  }
+  .worldCardEmoji { font-size: 34px; }
+  .worldCardTitle { font-weight: bold; font-size: 14px; margin-top: 4px; }
+  .worldCardAge { font-size: 12px; opacity: 0.9; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 8px; }
+  .worldCardSub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+  .worldActionBtn {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: none;
+    color: white;
+    cursor: pointer;
+    width: 100%;
+  }
+  .worldActionBtn.primary { background: linear-gradient(#8bd17c, #57a349); box-shadow: 0 3px 0 #3d7332; }
+  .worldActionBtn.secondary { background: linear-gradient(#f4a825, #d4820f); box-shadow: 0 3px 0 #8a5606; }
+  .worldActionBtn:active { transform: translateY(2px); }
+
   .levelCard {
     width: 150px;
     padding: 16px 10px;
@@ -204,21 +272,34 @@
   <div id="canvasWrapper">
     <canvas id="canvas"></canvas>
     <div id="hud">
-      <div id="hearts">❤️❤️❤️</div>
-      <div id="waveInfo">Select a Level</div>
-      <div id="score">Score: 0</div>
+      <div id="hudNormal">
+        <div id="hearts">❤️❤️❤️</div>
+        <div id="waveInfo">Select a World</div>
+        <div id="score">Score: 0</div>
+      </div>
+      <div id="quickUnlockBar" style="display:none;">
+        <div id="quickUnlockProgress">Mở khóa nhanh: 0/3</div>
+        <button id="quickUnlockCancelBtn" class="overlayBtn secondary">✕ Hủy</button>
+      </div>
     </div>
     <div id="overlay">
       <div id="overlayTitle">Game Over</div>
       <div id="overlaySubtitle">Score: 0</div>
       <div id="overlayButtons">
         <button id="primaryBtn" class="overlayBtn primary">Retry Level</button>
-        <button id="levelSelectBtn" class="overlayBtn secondary">Level Select</button>
+        <button id="levelSelectBtn" class="overlayBtn secondary">Chọn Level</button>
       </div>
     </div>
-    <div id="startOverlay" class="active">
+    <div id="worldSelectOverlay" class="active">
       <h1>🏰 Math Kingdom 👾</h1>
-      <p>Monsters are marching on the castle! Solve the math problem to shoot the closest monster.</p>
+      <p>Chọn thế giới của bạn! Monsters are marching on the castle — solve the math to shoot them down.</p>
+      <div id="worldCards"></div>
+    </div>
+    <div id="levelSelectOverlay">
+      <div id="levelSelectHeader">
+        <button id="backToWorldsBtn">← Thế giới</button>
+        <h1 id="levelSelectTitle" style="margin:0;">World</h1>
+      </div>
       <div id="levelCards"></div>
     </div>
   </div>
@@ -267,60 +348,236 @@
     WRONG_ANSWER_DISPLAY_MS: 1500,// how long the correct answer is shown after a wrong guess
     MONSTER_EMOJIS: ["👾", "🧟", "🐉", "👹", "🦖"], // cycled per wave
     CASTLE_X_FRACTION: 0.08,      // castle position as fraction of canvas width from left
-    SPAWN_X_FRACTION: 0.98,       // spawn position as fraction of canvas width from left
-    BOSS_EMOJI: "🐲",             // final-wave boss sprite (level 3 only)
+    SPAWN_X_FRACTION: 0.98,       // default spawn position as fraction of canvas width from left
+    BOSS_EMOJI: "🐲",             // default final-wave boss sprite (overridable per level)
     BOSS_HP: 3,                   // correct answers needed to defeat the boss
     BOSS_KILL_BONUS: 30,          // extra score on top of per-hit score when boss dies
     BOSS_SCALE: 1.7,              // boss render size multiplier vs a regular monster
     BOSS_SPEED_MULTIPLIER: 0.8,   // boss moves a bit slower than regular monsters despite being tougher
+    QUICK_UNLOCK_STREAK_REQUIRED: 3, // consecutive correct sample answers to skip-unlock a world
   };
 
-  // 3 story levels, selectable from the level-select screen. Progress (which
-  // levels are unlocked) is persisted in localStorage — no personal data.
-  const GAME_LEVELS = [
-    { id: 1, name: "Làng", emoji: "🏘️", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
-    { id: 2, name: "Rừng", emoji: "🌲", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
-    { id: 3, name: "Lâu đài Rồng", emoji: "🐉", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true },
+  // Adaptive difficulty: 3 tiers (easy/medium/hard) layered on top of whatever
+  // the current level allows, driven by the same correct/wrong streak counters
+  // regardless of question kind (arithmetic, multiplication, word problem...).
+  const DIFFICULTY_TIER_COUNT = 3;
+
+  // =========================================================================
+  // WORLDS — each world is a themed set of 3 levels (level 3 = boss wave).
+  // World 1 covers the original MVP content; Worlds 2-3 extend the age range.
+  // =========================================================================
+  const WORLDS = [
+    {
+      id: 1,
+      name: "Vương Quốc Cộng Trừ",
+      ageRange: "6-8 tuổi",
+      emoji: "🏰",
+      levels: [
+        { id: 1, name: "Làng", emoji: "🏘️", kind: "arithmetic", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 2, name: "Rừng", emoji: "🌲", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 3, name: "Lâu đài Rồng", emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🐲" },
+      ],
+    },
+    {
+      id: 2,
+      name: "Vương quốc Phép Nhân",
+      ageRange: "8-10 tuổi",
+      emoji: "✖️",
+      levels: [
+        { id: 1, name: "Chợ Nhân", emoji: "🛒", kind: "multiplication", tables: [2, 3, 4, 5], monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 2, name: "Xưởng Máy", emoji: "⚙️", kind: "multiplication", tables: [6, 7, 8, 9], monsterSpeedMultiplier: 1.0, hasBoss: false },
+        { id: 3, name: "Tháp Pháp Sư", emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🧙" },
+      ],
+    },
+    {
+      id: 3,
+      name: "Xứ sở Toán Đố",
+      ageRange: "10-12 tuổi",
+      emoji: "📖",
+      levels: [
+        { id: 1, name: "Làng Kể Chuyện", emoji: "📗", kind: "wordproblem", opSet: ["+", "-"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
+        { id: 2, name: "Chợ Bài Toán", emoji: "📘", kind: "wordproblem", opSet: ["+", "-", "*"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
+        { id: 3, name: "Đền Trí Tuệ", emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: true, bossEmoji: "🦉" },
+      ],
+    },
   ];
 
-  // Adaptive difficulty: 3 tiers (easy/medium/hard) layered on top of whatever
-  // the current game level allows. A level that disallows subtraction (Level 1)
-  // never introduces it, regardless of tier.
-  const DIFFICULTY_TIER_COUNT = 3;
-  const SUBTRACTION_CHANCE_BY_TIER = [0.3, 0.5, 0.7];
+  function getWorld(worldId) {
+    return WORLDS.find(w => w.id === worldId);
+  }
 
-  function getDifficultyTierConfig(levelConfig, tierIndex) {
-    if (!levelConfig.allowSubtraction) {
-      return { maxSum: levelConfig.maxSum, allowSubtraction: false, subtractionChance: 0 };
+  // =========================================================================
+  // QUESTION GENERATION — dispatches on level.kind
+  // =========================================================================
+  const SUBTRACTION_CHANCE_BY_TIER = [0.3, 0.5, 0.7];
+  const MULDIV_DIVISION_CHANCE_BY_TIER = [0.3, 0.5, 0.7];
+  const MULTIPLICATION_OPERAND_BAND_BY_TIER = [{ min: 1, max: 5 }, { min: 1, max: 8 }, { min: 1, max: 10 }];
+
+  const NAME_POOL = ["Lan", "Minh", "An", "Hoa", "Nam", "Mai", "Huy", "Linh", "Bình", "Trang", "Long", "Chi"];
+
+  const WORD_BANDS = {
+    add: [{ min: 5, max: 10 }, { min: 8, max: 20 }, { min: 15, max: 50 }],
+    sub: [{ min: 5, max: 10 }, { min: 8, max: 20 }, { min: 15, max: 50 }],
+    mul: [{ min: 2, max: 5 }, { min: 2, max: 9 }, { min: 2, max: 12 }],
+    div: [{ min: 2, max: 5 }, { min: 2, max: 9 }, { min: 2, max: 12 }],
+  };
+
+  const ADD_TEMPLATES = [
+    (name, a, b) => `${name} có ${a} viên kẹo, được cho thêm ${b} viên. Hỏi ${name} có tất cả bao nhiêu viên kẹo?`,
+    (name, a, b) => `Lớp học có ${a} bạn nam và ${b} bạn nữ. Hỏi lớp có tất cả bao nhiêu bạn?`,
+    (name, a, b) => `${name} hái được ${a} quả táo buổi sáng và ${b} quả táo buổi chiều. Hỏi ${name} hái được tất cả bao nhiêu quả táo?`,
+  ];
+  const SUB_TEMPLATES = [
+    (name, a, b) => `${name} có ${a} viên kẹo, cho bạn ${b} viên. Hỏi ${name} còn lại mấy viên kẹo?`,
+    (name, a, b) => `Trên cây có ${a} con chim, ${b} con bay đi. Hỏi trên cây còn lại mấy con chim?`,
+    (name, a, b) => `${name} có ${a} quyển vở, dùng hết ${b} quyển. Hỏi ${name} còn lại mấy quyển vở?`,
+  ];
+  const MUL_TEMPLATES = [
+    (name, a, b) => `${name} có ${a} hộp bút, mỗi hộp có ${b} cái bút. Hỏi ${name} có tất cả bao nhiêu cái bút?`,
+    (name, a, b) => `Có ${a} rổ táo, mỗi rổ có ${b} quả. Hỏi có tất cả bao nhiêu quả táo?`,
+    (name, a, b) => `${name} xếp ${a} hàng ghế, mỗi hàng có ${b} cái ghế. Hỏi có tất cả bao nhiêu cái ghế?`,
+  ];
+  const DIV_TEMPLATES = [
+    (name, a, b) => `${name} có ${a} viên kẹo, chia đều cho ${b} bạn. Hỏi mỗi bạn được mấy viên kẹo?`,
+    (name, a, b) => `Có ${a} quả cam chia đều vào ${b} rổ. Hỏi mỗi rổ có mấy quả cam?`,
+    (name, a, b) => `${name} có ${a} cái bánh, xếp đều vào ${b} đĩa. Hỏi mỗi đĩa có mấy cái bánh?`,
+  ];
+
+  function pickFrom(arr) {
+    return arr[randInt(0, arr.length - 1)];
+  }
+
+  function generateWordProblem(levelConfig, tierIndex) {
+    const op = pickFrom(levelConfig.opSet);
+    const name = pickFrom(NAME_POOL);
+    let a, b, answer, text;
+    if (op === "+") {
+      const band = WORD_BANDS.add[tierIndex];
+      a = randInt(band.min, band.max);
+      b = randInt(band.min, band.max);
+      answer = a + b;
+      text = pickFrom(ADD_TEMPLATES)(name, a, b);
+    } else if (op === "-") {
+      const band = WORD_BANDS.sub[tierIndex];
+      a = randInt(band.min, band.max);
+      b = randInt(1, a);
+      answer = a - b;
+      text = pickFrom(SUB_TEMPLATES)(name, a, b);
+    } else if (op === "*") {
+      const band = WORD_BANDS.mul[tierIndex];
+      a = randInt(band.min, band.max);
+      b = randInt(band.min, band.max);
+      answer = a * b;
+      text = pickFrom(MUL_TEMPLATES)(name, a, b);
+    } else {
+      const band = WORD_BANDS.div[tierIndex];
+      b = randInt(band.min, band.max);
+      const quotient = randInt(band.min, band.max);
+      a = b * quotient;
+      answer = quotient;
+      text = pickFrom(DIV_TEMPLATES)(name, a, b);
     }
-    return {
-      maxSum: levelConfig.maxSum,
-      allowSubtraction: true,
-      subtractionChance: SUBTRACTION_CHANCE_BY_TIER[tierIndex],
-    };
+    return { isWordProblem: true, text, answer };
+  }
+
+  function generateMultiplication(levelConfig, tierIndex) {
+    const table = pickFrom(levelConfig.tables);
+    const band = MULTIPLICATION_OPERAND_BAND_BY_TIER[tierIndex];
+    const operand = randInt(band.min, band.max);
+    const swap = Math.random() < 0.5;
+    const a = swap ? operand : table;
+    const b = swap ? table : operand;
+    return { a, b, op: "×", answer: table * operand, isWordProblem: false };
+  }
+
+  function generateMixedMulDiv(levelConfig, tierIndex) {
+    const doDivision = Math.random() < MULDIV_DIVISION_CHANCE_BY_TIER[tierIndex];
+    const table = pickFrom(levelConfig.tables);
+    const band = MULTIPLICATION_OPERAND_BAND_BY_TIER[tierIndex];
+    const operand = randInt(band.min, band.max);
+    if (doDivision) {
+      const dividend = table * operand;
+      return { a: dividend, b: table, op: "÷", answer: operand, isWordProblem: false };
+    }
+    const swap = Math.random() < 0.5;
+    const a = swap ? operand : table;
+    const b = swap ? table : operand;
+    return { a, b, op: "×", answer: table * operand, isWordProblem: false };
+  }
+
+  function generateArithmetic(levelConfig, tierIndex) {
+    const maxSum = levelConfig.maxSum;
+    const allowSubtraction = levelConfig.allowSubtraction;
+    const subtractionChance = allowSubtraction ? SUBTRACTION_CHANCE_BY_TIER[tierIndex] : 0;
+    const doSubtraction = allowSubtraction && Math.random() < subtractionChance;
+    let a, b, op, answer;
+    if (doSubtraction) {
+      a = randInt(2, maxSum);
+      b = randInt(1, a);
+      op = "-";
+      answer = a - b;
+    } else {
+      a = randInt(0, maxSum);
+      b = randInt(0, maxSum - a);
+      if (a === 0 && b === 0) { a = randInt(1, maxSum); }
+      op = "+";
+      answer = a + b;
+    }
+    return { a, b, op, answer, isWordProblem: false };
+  }
+
+  function generateQuestionForLevel(levelConfig, tierIndex) {
+    if (levelConfig.kind === "multiplication") return generateMultiplication(levelConfig, tierIndex);
+    if (levelConfig.kind === "mixed_muldiv") return generateMixedMulDiv(levelConfig, tierIndex);
+    if (levelConfig.kind === "wordproblem") return generateWordProblem(levelConfig, tierIndex);
+    return generateArithmetic(levelConfig, tierIndex);
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
   // =========================================================================
   // PROGRESS PERSISTENCE — localStorage only, gameplay unlock state, no PII
   // =========================================================================
-  const PROGRESS_KEY = "mathKingdomProgress";
+  const PROGRESS_KEY = "mathKingdomProgressV2";
+
+  function defaultProgress() {
+    const worlds = {};
+    WORLDS.forEach((w, i) => { worlds[w.id] = { unlocked: i === 0, unlockedLevel: 1 }; });
+    return { worlds };
+  }
 
   function loadProgress() {
+    const fallback = defaultProgress();
     try {
       const raw = localStorage.getItem(PROGRESS_KEY);
-      if (!raw) return { unlockedLevel: 1 };
+      if (!raw) return fallback;
       const parsed = JSON.parse(raw);
-      const unlockedLevel = Math.min(GAME_LEVELS.length, Math.max(1, parseInt(parsed.unlockedLevel, 10) || 1));
-      return { unlockedLevel: unlockedLevel };
+      const worlds = {};
+      WORLDS.forEach((w, i) => {
+        const saved = parsed.worlds && parsed.worlds[w.id];
+        const unlocked = i === 0 ? true : !!(saved && saved.unlocked);
+        const unlockedLevel = Math.min(w.levels.length, Math.max(1, parseInt(saved && saved.unlockedLevel, 10) || 1));
+        worlds[w.id] = { unlocked, unlockedLevel };
+      });
+      return { worlds };
     } catch (e) {
-      return { unlockedLevel: 1 };
+      return fallback;
     }
   }
 
-  function saveProgress(progress) {
+  function saveProgress() {
     try {
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
     } catch (e) { /* storage unavailable, ignore */ }
+  }
+
+  function getWorldProgress(worldId) {
+    if (!progress.worlds[worldId]) {
+      progress.worlds[worldId] = { unlocked: false, unlockedLevel: 1 };
+    }
+    return progress.worlds[worldId];
   }
 
   let progress = loadProgress();
@@ -394,7 +651,9 @@
   // GAME STATE
   // =========================================================================
   let state = {
-    gameLevelIndex: 0,
+    mode: "menu", // "menu" | "quiz" | "playing"
+    worldIndex: 0,
+    levelIndex: 0,
     hearts: BALANCE.TOTAL_HEARTS,
     score: 0,
     wave: 1,
@@ -409,6 +668,7 @@
     currentAnswer: "",
     currentQuestion: null,
     running: false,
+    inputEnabled: false,
     spawnTimer: 0,
     spawnIntervalMs: BALANCE.BASE_SPAWN_INTERVAL_MS,
     lastFrameTime: 0,
@@ -416,52 +676,38 @@
     waitingForNextQuestion: false,
     gameEnded: false,
     isBossWave: false,
+    quickUnlockWorldId: null,
+    quickUnlockStreak: 0,
   };
 
-  // =========================================================================
-  // MATH QUESTION GENERATION
-  // =========================================================================
-  function generateQuestion() {
-    const lvl = GAME_LEVELS[state.gameLevelIndex];
-    const tier = getDifficultyTierConfig(lvl, state.difficultyIndex);
-    let a, b, op, answer;
-    const doSubtraction = tier.allowSubtraction && Math.random() < tier.subtractionChance;
-
-    if (doSubtraction) {
-      a = randInt(2, tier.maxSum);
-      b = randInt(1, a); // ensure non-negative result
-      op = "-";
-      answer = a - b;
-    } else {
-      const maxA = tier.maxSum;
-      a = randInt(0, maxA);
-      b = randInt(0, maxA - a);
-      // avoid trivial 0+0
-      if (a === 0 && b === 0) { a = randInt(1, maxA); }
-      op = "+";
-      answer = a + b;
-    }
-    return { a, b, op, answer };
+  function currentLevel() {
+    return WORLDS[state.worldIndex].levels[state.levelIndex];
   }
-
-  function randInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+  function currentWorld() {
+    return WORLDS[state.worldIndex];
   }
 
   function newQuestion() {
-    state.currentQuestion = generateQuestion();
+    state.currentQuestion = generateQuestionForLevel(currentLevel(), state.difficultyIndex);
     state.currentAnswer = "";
     updateQuestionDisplay();
   }
 
   function updateQuestionDisplay() {
     const q = state.currentQuestion;
-    document.getElementById("question").textContent = `${q.a} ${q.op} ${q.b} = ?`;
+    const questionEl = document.getElementById("question");
+    if (q.isWordProblem) {
+      questionEl.textContent = q.text;
+      questionEl.classList.add("wordProblemText");
+    } else {
+      questionEl.textContent = `${q.a} ${q.op} ${q.b} = ?`;
+      questionEl.classList.remove("wordProblemText");
+    }
     document.getElementById("answerDisplay").textContent = state.currentAnswer || " ";
   }
 
   // =========================================================================
-  // DIFFICULTY ADAPTATION (adaptive tier within the current game level)
+  // DIFFICULTY ADAPTATION (adaptive tier within the current level)
   // =========================================================================
   function onCorrectAnswer() {
     state.correctStreak++;
@@ -498,7 +744,7 @@
     return BALANCE.BASE_MONSTERS_PER_WAVE + (wave - 1) * BALANCE.MONSTERS_PER_WAVE_INCREMENT;
   }
   function speedForWave(wave) {
-    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    const lvl = currentLevel();
     return (BALANCE.BASE_MONSTER_SPEED + (wave - 1) * BALANCE.WAVE_SPEED_INCREMENT) * lvl.monsterSpeedMultiplier;
   }
   function spawnIntervalForWave(wave) {
@@ -509,7 +755,8 @@
   }
 
   function startWave(waveNum) {
-    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    const world = currentWorld();
+    const lvl = currentLevel();
     state.wave = waveNum;
     const regularCount = monstersInWave(waveNum);
     state.isBossWave = !!(lvl.hasBoss && waveNum === BALANCE.TOTAL_WAVES);
@@ -519,17 +766,19 @@
     state.spawnTimer = 0;
     state.waveInProgress = true;
     document.getElementById("waveInfo").textContent =
-      `Level ${lvl.id}: ${lvl.name} — Wave ${waveNum}/${BALANCE.TOTAL_WAVES}`;
+      `${world.emoji} Level ${lvl.id}: ${lvl.name} — Wave ${waveNum}/${BALANCE.TOTAL_WAVES}`;
   }
 
   function spawnMonster() {
     const rect = canvas.getBoundingClientRect();
+    const lvl = currentLevel();
     const isBoss = state.isBossWave && state.monstersRemainingToSpawn === 1;
+    const spawnXFraction = lvl.spawnXFraction || BALANCE.SPAWN_X_FRACTION;
     const laneY = rect.height * (0.25 + Math.random() * 0.5);
     state.monsters.push({
-      x: rect.width * BALANCE.SPAWN_X_FRACTION,
+      x: rect.width * spawnXFraction,
       y: isBoss ? rect.height * 0.5 : laneY,
-      emoji: isBoss ? BALANCE.BOSS_EMOJI : BALANCE.MONSTER_EMOJIS[(state.wave - 1) % BALANCE.MONSTER_EMOJIS.length],
+      emoji: isBoss ? (lvl.bossEmoji || BALANCE.BOSS_EMOJI) : BALANCE.MONSTER_EMOJIS[(state.wave - 1) % BALANCE.MONSTER_EMOJIS.length],
       speed: speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : 1),
       hp: isBoss ? BALANCE.BOSS_HP : 1,
       maxHp: isBoss ? BALANCE.BOSS_HP : 1,
@@ -590,7 +839,7 @@
       if (m.isBoss) {
         state.score += BALANCE.BOSS_KILL_BONUS;
         document.getElementById("score").textContent = `Score: ${state.score}`;
-        showFeedback("Boss defeated! 🐉💥", "#e8590c");
+        showFeedback("Boss defeated! 💥", "#e8590c");
       }
       for (let i = 0; i < (m.isBoss ? 20 : 8); i++) {
         state.particles.push({
@@ -630,14 +879,21 @@
     document.getElementById("bottomPanel").classList.toggle("disabled", !enabled);
   }
 
-  // outcome: "gameover" | "levelComplete" | "victory"
+  function setHudMode(mode) {
+    document.getElementById("hudNormal").style.display = mode === "quiz" ? "none" : "flex";
+    document.getElementById("quickUnlockBar").style.display = mode === "quiz" ? "flex" : "none";
+  }
+
+  // outcome: "gameover" | "levelComplete" | "worldComplete" | "victory"
   function endGame(outcome) {
     if (state.gameEnded) return;
     state.gameEnded = true;
     state.running = false;
+    state.inputEnabled = false;
     setBottomPanelEnabled(false);
 
-    const lvl = GAME_LEVELS[state.gameLevelIndex];
+    const world = currentWorld();
+    const lvl = currentLevel();
     const titleEl = document.getElementById("overlayTitle");
     const subEl = document.getElementById("overlaySubtitle");
     const primaryBtn = document.getElementById("primaryBtn");
@@ -645,26 +901,39 @@
     if (outcome === "gameover") {
       titleEl.textContent = "Game Over";
       subEl.textContent = `Score: ${state.score}`;
-      primaryBtn.textContent = "Retry Level";
-      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(lvl.id); };
+      primaryBtn.textContent = "Chơi lại";
+      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(world.id, lvl.id); };
       Audio_.gameOver();
     } else if (outcome === "levelComplete") {
-      if (progress.unlockedLevel <= lvl.id && lvl.id < GAME_LEVELS.length) {
-        progress.unlockedLevel = lvl.id + 1;
-        saveProgress(progress);
+      const wp = getWorldProgress(world.id);
+      if (wp.unlockedLevel <= lvl.id && lvl.id < world.levels.length) {
+        wp.unlockedLevel = lvl.id + 1;
+        saveProgress();
       }
-      const nextLvl = GAME_LEVELS[lvl.id];
+      const nextLvl = world.levels[lvl.id];
       titleEl.textContent = `Level Complete! ${lvl.emoji}`;
       subEl.textContent = `Score: ${state.score} — Next up: ${nextLvl.name}`;
-      primaryBtn.textContent = "Next Level";
-      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(nextLvl.id); };
+      primaryBtn.textContent = "Level tiếp theo";
+      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(world.id, nextLvl.id); };
       Audio_.victory();
       startConfetti();
-    } else if (outcome === "victory") {
-      titleEl.textContent = "Victory! 🎉";
-      subEl.textContent = `Score: ${state.score} — You saved the kingdom!`;
-      primaryBtn.textContent = "Play Again";
-      primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(lvl.id); };
+    } else if (outcome === "worldComplete") {
+      const isLastWorld = world.id >= WORLDS.length;
+      if (!isLastWorld) {
+        const nextWorld = WORLDS[world.id];
+        const nwp = getWorldProgress(nextWorld.id);
+        nwp.unlocked = true;
+        saveProgress();
+        titleEl.textContent = `World Complete! ${world.emoji}`;
+        subEl.textContent = `Score: ${state.score} — Next up: ${nextWorld.name}`;
+        primaryBtn.textContent = "Thế giới tiếp theo";
+        primaryBtn.onclick = () => { Audio_.resumeCtx(); showLevelSelect(nextWorld.id); };
+      } else {
+        titleEl.textContent = "Victory! 🎉";
+        subEl.textContent = `Score: ${state.score} — You saved the kingdom!`;
+        primaryBtn.textContent = "Chơi lại";
+        primaryBtn.onclick = () => { Audio_.resumeCtx(); startLevel(world.id, lvl.id); };
+      }
       Audio_.victory();
       startConfetti();
     }
@@ -692,13 +961,48 @@
   }
 
   // =========================================================================
-  // LEVEL SELECT SCREEN
+  // WORLD SELECT / LEVEL SELECT SCREENS
   // =========================================================================
-  function renderLevelCards() {
+  function renderWorldCards() {
+    const container = document.getElementById("worldCards");
+    container.innerHTML = "";
+    WORLDS.forEach((world) => {
+      const wp = getWorldProgress(world.id);
+      const card = document.createElement("div");
+      card.className = "worldCard" + (wp.unlocked ? "" : " locked");
+      card.innerHTML =
+        `<div class="worldCardEmoji">${wp.unlocked ? world.emoji : "🔒"}</div>` +
+        `<div class="worldCardTitle">World ${world.id}: ${world.name}</div>` +
+        `<div class="worldCardAge">${world.ageRange}</div>`;
+      if (wp.unlocked) {
+        const playBtn = document.createElement("button");
+        playBtn.className = "worldActionBtn primary";
+        playBtn.textContent = "Chơi";
+        playBtn.addEventListener("click", () => { Audio_.resumeCtx(); showLevelSelect(world.id); });
+        card.appendChild(playBtn);
+      } else {
+        const sub = document.createElement("div");
+        sub.className = "worldCardSub";
+        sub.textContent = "Khóa — hoàn thành world trước để mở, hoặc:";
+        card.appendChild(sub);
+        const quickBtn = document.createElement("button");
+        quickBtn.className = "worldActionBtn secondary";
+        quickBtn.textContent = "Mở khóa nhanh ⚡";
+        quickBtn.addEventListener("click", () => startQuickUnlockQuiz(world.id));
+        card.appendChild(quickBtn);
+      }
+      container.appendChild(card);
+    });
+  }
+
+  function renderLevelCards(worldId) {
+    const world = getWorld(worldId);
+    const wp = getWorldProgress(worldId);
+    document.getElementById("levelSelectTitle").textContent = `World ${world.id}: ${world.name}`;
     const container = document.getElementById("levelCards");
     container.innerHTML = "";
-    GAME_LEVELS.forEach((lvl) => {
-      const unlocked = lvl.id <= progress.unlockedLevel;
+    world.levels.forEach((lvl) => {
+      const unlocked = lvl.id <= wp.unlockedLevel;
       const btn = document.createElement("button");
       btn.className = "levelCard" + (unlocked ? "" : " locked");
       btn.disabled = !unlocked;
@@ -707,37 +1011,133 @@
         `<div class="levelCardTitle">Level ${lvl.id}: ${lvl.name}</div>` +
         `<div class="levelCardSub">${unlocked ? "Tap to play" : "Locked"}</div>`;
       if (unlocked) {
-        btn.addEventListener("click", () => startLevel(lvl.id));
+        btn.addEventListener("click", () => startLevel(world.id, lvl.id));
       }
       container.appendChild(btn);
     });
   }
 
-  function showLevelSelect() {
+  function showWorldSelect() {
+    state.mode = "menu";
     state.running = false;
+    state.inputEnabled = false;
     document.getElementById("overlay").classList.remove("active");
-    renderLevelCards();
-    document.getElementById("startOverlay").classList.add("active");
+    document.getElementById("levelSelectOverlay").classList.remove("active");
+    renderWorldCards();
+    document.getElementById("worldSelectOverlay").classList.add("active");
     setBottomPanelEnabled(false);
+    setHudMode("menu");
+  }
+
+  function showLevelSelect(worldId) {
+    state.mode = "menu";
+    state.running = false;
+    state.inputEnabled = false;
+    document.getElementById("overlay").classList.remove("active");
+    document.getElementById("worldSelectOverlay").classList.remove("active");
+    renderLevelCards(worldId);
+    document.getElementById("levelSelectOverlay").classList.add("active");
+    setBottomPanelEnabled(false);
+    setHudMode("menu");
   }
 
   document.getElementById("levelSelectBtn").addEventListener("click", () => {
     Audio_.resumeCtx();
-    showLevelSelect();
+    showLevelSelect(currentWorld().id);
+  });
+  document.getElementById("backToWorldsBtn").addEventListener("click", () => {
+    Audio_.resumeCtx();
+    showWorldSelect();
   });
 
-  function startLevel(levelId) {
+  function startLevel(worldId, levelId) {
     Audio_.resumeCtx();
-    state.gameLevelIndex = levelId - 1;
-    document.getElementById("startOverlay").classList.remove("active");
+    state.worldIndex = WORLDS.findIndex(w => w.id === worldId);
+    state.levelIndex = getWorld(worldId).levels.findIndex(l => l.id === levelId);
+    state.mode = "playing";
+    document.getElementById("levelSelectOverlay").classList.remove("active");
+    document.getElementById("worldSelectOverlay").classList.remove("active");
+    setHudMode("playing");
     resetState();
+  }
+
+  // =========================================================================
+  // QUICK UNLOCK — answer 3 sample questions correctly in a row to skip ahead
+  // =========================================================================
+  function startQuickUnlockQuiz(worldId) {
+    Audio_.resumeCtx();
+    state.mode = "quiz";
+    state.quickUnlockWorldId = worldId;
+    state.quickUnlockStreak = 0;
+    state.running = false;
+    state.inputEnabled = true;
+    state.waitingForNextQuestion = false;
+    document.getElementById("worldSelectOverlay").classList.remove("active");
+    document.getElementById("levelSelectOverlay").classList.remove("active");
+    document.getElementById("overlay").classList.remove("active");
+    setBottomPanelEnabled(true);
+    setHudMode("quiz");
+    updateQuickUnlockProgress();
+    generateQuizQuestion();
+  }
+
+  function updateQuickUnlockProgress() {
+    const world = getWorld(state.quickUnlockWorldId);
+    document.getElementById("quickUnlockProgress").textContent =
+      `Mở khóa nhanh: ${world.name} — ${state.quickUnlockStreak}/${BALANCE.QUICK_UNLOCK_STREAK_REQUIRED} đúng liên tiếp`;
+  }
+
+  function generateQuizQuestion() {
+    const world = getWorld(state.quickUnlockWorldId);
+    state.currentQuestion = generateQuestionForLevel(world.levels[0], 1);
+    state.currentAnswer = "";
+    updateQuestionDisplay();
+  }
+
+  document.getElementById("quickUnlockCancelBtn").addEventListener("click", () => {
+    Audio_.resumeCtx();
+    showWorldSelect();
+  });
+
+  function submitQuickUnlockAnswer() {
+    const userVal = parseInt(state.currentAnswer, 10);
+    const correct = userVal === state.currentQuestion.answer;
+    if (correct) {
+      state.quickUnlockStreak++;
+      Audio_.correct();
+      showFeedback("Đúng! 🎯", "#2f9e44");
+      if (state.quickUnlockStreak >= BALANCE.QUICK_UNLOCK_STREAK_REQUIRED) {
+        const wp = getWorldProgress(state.quickUnlockWorldId);
+        wp.unlocked = true;
+        saveProgress();
+        Audio_.tierUp();
+        const worldId = state.quickUnlockWorldId;
+        state.mode = "menu";
+        showLevelSelect(worldId);
+        return;
+      }
+      updateQuickUnlockProgress();
+      generateQuizQuestion();
+    } else {
+      state.quickUnlockStreak = 0;
+      Audio_.wrong();
+      const correctAns = state.currentQuestion.answer;
+      showFeedback(`Sai rồi! Đáp án là ${correctAns}. Thử lại nhé!`, "#e03131");
+      document.getElementById("answerDisplay").textContent = String(correctAns);
+      updateQuickUnlockProgress();
+      state.waitingForNextQuestion = true;
+      setTimeout(() => {
+        state.waitingForNextQuestion = false;
+        generateQuizQuestion();
+      }, BALANCE.WRONG_ANSWER_DISPLAY_MS);
+    }
   }
 
   // =========================================================================
   // INPUT HANDLING
   // =========================================================================
   function handleKey(key) {
-    if (!state.running || state.waitingForNextQuestion) return;
+    if (!state.inputEnabled || state.waitingForNextQuestion) return;
     if (key === "clear") {
       state.currentAnswer = "";
     } else if (key === "enter") {
@@ -753,6 +1153,10 @@
 
   function submitAnswer() {
     if (state.currentAnswer === "") return;
+    if (state.mode === "quiz") {
+      submitQuickUnlockAnswer();
+      return;
+    }
     const userVal = parseInt(state.currentAnswer, 10);
     const correct = userVal === state.currentQuestion.answer;
     if (correct) {
@@ -871,11 +1275,12 @@
     if (!state.gameEnded && state.waveInProgress && state.monstersRemainingToSpawn <= 0 && state.monstersAliveOrPending <= 0) {
       state.waveInProgress = false;
       if (state.wave >= BALANCE.TOTAL_WAVES) {
-        const lvl = GAME_LEVELS[state.gameLevelIndex];
-        if (lvl.id < GAME_LEVELS.length) {
+        const lvl = currentLevel();
+        const world = currentWorld();
+        if (lvl.id < world.levels.length) {
           endGame("levelComplete");
         } else {
-          endGame("victory");
+          endGame("worldComplete");
         }
       } else {
         setTimeout(() => {
@@ -1005,6 +1410,7 @@
     state.wrongStreak = 0;
     state.currentAnswer = "";
     state.running = true;
+    state.inputEnabled = true;
     state.gameEnded = false;
     state.waveInProgress = false;
     state.waitingForNextQuestion = false;
@@ -1012,7 +1418,8 @@
     document.getElementById("score").textContent = "Score: 0";
     updateHeartsDisplay();
     document.getElementById("overlay").classList.remove("active");
-    document.getElementById("startOverlay").classList.remove("active");
+    document.getElementById("worldSelectOverlay").classList.remove("active");
+    document.getElementById("levelSelectOverlay").classList.remove("active");
     setBottomPanelEnabled(true);
     newQuestion();
     startWave(1);
@@ -1021,7 +1428,7 @@
   window.addEventListener("resize", resizeCanvas);
   resizeCanvas();
   updateHeartsDisplay();
-  showLevelSelect();
+  showWorldSelect();
   requestAnimationFrame(loop);
 })();
 </script>
