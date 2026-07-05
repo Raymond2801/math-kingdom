@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Math Kingdom</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
+    margin: 0; padding: 0; width: 100%;
+    height: 100vh;   /* fallback for browsers without dvh support */
+    height: 100dvh;  /* dynamic viewport height: accounts for Safari's collapsing toolbars */
     overflow: hidden;
     background: linear-gradient(#87CEEB, #B0E0E6);
     font-family: 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
@@ -15,10 +17,26 @@
   }
   #gameContainer {
     position: relative;
-    width: 100vw;
+    width: 100%;
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
+    /* Respect notches/home-indicator/rounded corners on iPhone; padding is
+       included in the 100dvh box via border-box, so it carves space inward
+       instead of pushing the layout past the visible viewport. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  /* On short viewports (phones in landscape) shrink the bottom panel so the
+     full number pad + question always fit without scrolling; the canvas
+     above absorbs whatever space is left. */
+  @media (max-height: 480px) {
+    #bottomPanel { padding: 4px 10px 6px; gap: 3px; }
+    .numBtn { padding: 6px 0; }
+    #question { font-size: clamp(16px, 4.5vw, 26px); }
+    #question.wordProblemText { font-size: clamp(12px, 2.4vw, 16px); }
+    #feedback { font-size: clamp(13px, 3vw, 18px); min-height: 1.2em; }
+    #answerDisplay { font-size: clamp(16px, 4vw, 22px); min-height: 1em; }
   }
   #canvasWrapper {
     position: relative;
@@ -368,15 +386,13 @@
     BASE_SPAWN_INTERVAL_MS: 2600, // ms between spawns at wave 1
     SPAWN_INTERVAL_DECREMENT_MS: 250, // spawn gets faster (smaller interval) each wave
     MIN_SPAWN_INTERVAL_MS: 900,   // floor for spawn interval
-    ARROW_SPEED: 9,               // px/frame for arrow projectile
+    CANNONBALL_SPEED: 9,          // px/frame for the cannonball projectile
+    CANNONBALL_ARC_HEIGHT: 40,    // px the cannonball rises above the direct line at the midpoint of its flight
     SCORE_PER_CORRECT: 10,        // points per monster kill (or per boss hit)
     STREAK_UP_THRESHOLD: 5,       // consecutive correct answers to raise difficulty tier
     STREAK_DOWN_THRESHOLD: 2,     // consecutive wrong answers to lower difficulty tier
     WRONG_ANSWER_DISPLAY_MS: 1500,// how long the correct answer is shown after a wrong guess
-    MONSTER_EMOJIS: ["👾", "🧟", "🐉", "👹", "🦖"], // cycled per wave
-    CASTLE_X_FRACTION: 0.08,      // castle position as fraction of canvas width from left
     SPAWN_X_FRACTION: 0.98,       // default spawn position as fraction of canvas width from left
-    BOSS_EMOJI: "🐲",             // default final-wave boss sprite (overridable per level)
     BOSS_HP: 3,                   // correct answers needed to defeat the boss
     BOSS_KILL_BONUS: 30,          // extra score on top of per-hit score when boss dies
     BOSS_SCALE: 1.7,              // boss render size multiplier vs a regular monster
@@ -515,7 +531,7 @@
       levels: [
         { id: 1, emoji: "🏘️", kind: "arithmetic", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
         { id: 2, emoji: "🌲", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 3, emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🐲" },
+        { id: 3, emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true },
       ],
     },
     {
@@ -524,7 +540,7 @@
       levels: [
         { id: 1, emoji: "🛒", kind: "multiplication", tables: [2, 3, 4, 5], monsterSpeedMultiplier: 1.0, hasBoss: false },
         { id: 2, emoji: "⚙️", kind: "multiplication", tables: [6, 7, 8, 9], monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 3, emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 1.35, hasBoss: true, bossEmoji: "🧙" },
+        { id: 3, emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 1.35, hasBoss: true },
       ],
     },
     {
@@ -533,7 +549,7 @@
       levels: [
         { id: 1, emoji: "📗", kind: "wordproblem", opSet: ["+", "-"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
         { id: 2, emoji: "📘", kind: "wordproblem", opSet: ["+", "-", "*"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
-        { id: 3, emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: true, bossEmoji: "🦉" },
+        { id: 3, emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: true },
       ],
     },
   ];
@@ -541,6 +557,36 @@
   function getWorld(worldId) {
     return WORLDS.find(w => w.id === worldId);
   }
+
+  // =========================================================================
+  // MONSTER VISUAL DESIGNS — Canvas-drawn creatures, no image assets. Regular
+  // monsters cycle by wave (like the old emoji set did); each world's boss
+  // (level 3, final wave) uses its own bigger design with an HP bar.
+  // =========================================================================
+  const MONSTER_DESIGNS = {
+    1: [ // World 1 "Cộng Trừ": slimes and goblins
+      { shape: "slime", color: "#7ed957", accent: "#4a9e2f" },
+      { shape: "slime", color: "#7b6cf0", accent: "#5443c9" },
+      { shape: "goblin", color: "#8fae4a", accent: "#5c7a2e" },
+      { shape: "goblin", color: "#c98a4a", accent: "#8a5a26" },
+    ],
+    2: [ // World 2 "Phép Nhân": factory robots
+      { shape: "robot", color: "#b0b8c0", accent: "#5a6570" },
+      { shape: "robot", color: "#f0a840", accent: "#a86e20" },
+      { shape: "robot", color: "#6ec6e8", accent: "#2f7d9e" },
+    ],
+    3: [ // World 3 "Toán Đố": owls and books
+      { shape: "owl", color: "#a8794a", accent: "#6b4a28" },
+      { shape: "owl", color: "#8a8fae", accent: "#54597a" },
+      { shape: "book", color: "#e05a5a", accent: "#a83232" },
+      { shape: "book", color: "#4a8ae0", accent: "#2f5aa8" },
+    ],
+  };
+  const BOSS_DESIGNS = {
+    1: { shape: "dragon", color: "#5a9e3f", accent: "#2f6e1f" },
+    2: { shape: "wizard", color: "#7a4ae0", accent: "#4a2896" },
+    3: { shape: "owlking", color: "#c9a24a", accent: "#8a6a1f" },
+  };
 
   // =========================================================================
   // QUESTION GENERATION — dispatches on level.kind
@@ -882,7 +928,8 @@
     monstersRemainingToSpawn: 0,
     monstersAliveOrPending: 0,
     monsters: [],
-    arrows: [],
+    cannonballs: [],
+    cannonRecoil: 0,
     particles: [],
     difficultyIndex: 0,
     correctStreak: 0,
@@ -993,14 +1040,19 @@
 
   function spawnMonster() {
     const rect = canvas.getBoundingClientRect();
+    const world = currentWorld();
     const lvl = currentLevel();
     const isBoss = state.isBossWave && state.monstersRemainingToSpawn === 1;
     const spawnXFraction = lvl.spawnXFraction || BALANCE.SPAWN_X_FRACTION;
     const laneY = rect.height * (0.25 + Math.random() * 0.5);
+    const designs = MONSTER_DESIGNS[world.id];
+    const design = isBoss ? BOSS_DESIGNS[world.id] : designs[(state.wave - 1) % designs.length];
     state.monsters.push({
       x: rect.width * spawnXFraction,
       y: isBoss ? rect.height * 0.5 : laneY,
-      emoji: isBoss ? (lvl.bossEmoji || BALANCE.BOSS_EMOJI) : BALANCE.MONSTER_EMOJIS[(state.wave - 1) % BALANCE.MONSTER_EMOJIS.length],
+      shape: design.shape,
+      color: design.color,
+      accent: design.accent,
       speed: speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : 1),
       hp: isBoss ? BALANCE.BOSS_HP : 1,
       maxHp: isBoss ? BALANCE.BOSS_HP : 1,
@@ -1009,12 +1061,37 @@
       dying: false,
       dieTimer: 0,
       bobOffset: Math.random() * Math.PI * 2,
+      blinkOffset: Math.random() * 3000,
     });
     state.monstersRemainingToSpawn--;
   }
 
+  // Castle geometry is computed once here and reused by both the collision
+  // check (how close a monster must get to reach the castle) and the
+  // renderer (drawCastle/getCannonMuzzle), so the hit boundary always lines
+  // up with the wall's drawn right edge regardless of canvas size.
+  function getCastleGeometry(rect) {
+    const groundY = rect.height * 0.75;
+    const wallHeight = rect.height * 0.5;
+    const wallWidth = Math.max(90, rect.width * 0.14);
+    const wallX = -wallWidth * 0.25; // partially off the left edge is fine
+    const wallY = groundY - wallHeight;
+    const towerWidth = wallWidth * 0.5;
+    const towerHeight = wallHeight * 1.25;
+    const towerX = wallX + wallWidth - towerWidth * 0.55;
+    const towerY = groundY - towerHeight;
+    return { groundY, wallX, wallY, wallWidth, wallHeight, towerX, towerY, towerWidth, towerHeight };
+  }
+
+  function getCannonMuzzle(rect) {
+    const g = getCastleGeometry(rect);
+    return { x: g.wallX + g.wallWidth * 0.55, y: g.wallY - 6 };
+  }
+
   function castleX() {
-    return canvas.getBoundingClientRect().width * BALANCE.CASTLE_X_FRACTION;
+    const rect = canvas.getBoundingClientRect();
+    const g = getCastleGeometry(rect);
+    return g.wallX + g.wallWidth;
   }
 
   // =========================================================================
@@ -1028,13 +1105,32 @@
       if (m.x < closest.x) closest = m;
     }
     const rect = canvas.getBoundingClientRect();
-    state.arrows.push({
-      x: rect.width * BALANCE.CASTLE_X_FRACTION + 30,
-      y: rect.height * 0.5,
+    const muzzle = getCannonMuzzle(rect);
+    const dist = Math.max(1, Math.hypot(closest.x - muzzle.x, closest.y - muzzle.y));
+    state.cannonballs.push({
+      x: muzzle.x,
+      y: muzzle.y,
       target: closest,
+      initialDist: dist,
+      rotation: 0,
     });
+    state.cannonRecoil = 1;
     Audio_.shoot();
     return true;
+  }
+
+  // Small burst of particles at the cannonball's impact point, distinct from
+  // the particles hitMonster() spawns at the monster itself.
+  function spawnImpactBurst(x, y) {
+    for (let i = 0; i < 10; i++) {
+      state.particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 6,
+        vy: (Math.random() - 0.5) * 6 - 1,
+        life: 20,
+        color: `hsl(${20 + Math.random() * 30}, 95%, ${55 + Math.random() * 15}%)`,
+      });
+    }
   }
 
   // An arrow hitting its target: regular monsters die in one hit, the boss
@@ -1477,23 +1573,31 @@
       }
     }
 
-    // arrows
-    for (let i = state.arrows.length - 1; i >= 0; i--) {
-      const arrow = state.arrows[i];
-      if (arrow.target.dying || !state.monsters.includes(arrow.target)) {
-        state.arrows.splice(i, 1);
+    // cannon recoil decay (visual only)
+    if (state.cannonRecoil > 0) {
+      state.cannonRecoil -= dt / 150;
+      if (state.cannonRecoil < 0) state.cannonRecoil = 0;
+    }
+
+    // cannonballs
+    for (let i = state.cannonballs.length - 1; i >= 0; i--) {
+      const ball = state.cannonballs[i];
+      if (ball.target.dying || !state.monsters.includes(ball.target)) {
+        state.cannonballs.splice(i, 1);
         continue;
       }
-      const dx = arrow.target.x - arrow.x;
-      const dy = arrow.target.y - arrow.y;
+      const dx = ball.target.x - ball.x;
+      const dy = ball.target.y - ball.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 15) {
-        hitMonster(arrow.target);
-        state.arrows.splice(i, 1);
+        hitMonster(ball.target);
+        spawnImpactBurst(ball.x, ball.y);
+        state.cannonballs.splice(i, 1);
       } else {
-        const speed = BALANCE.ARROW_SPEED * (dt / 16.6667);
-        arrow.x += (dx / dist) * speed;
-        arrow.y += (dy / dist) * speed;
+        const speed = BALANCE.CANNONBALL_SPEED * (dt / 16.6667);
+        ball.x += (dx / dist) * speed;
+        ball.y += (dy / dist) * speed;
+        ball.rotation += 0.25 * (dt / 16.6667);
       }
     }
 
@@ -1537,12 +1641,343 @@
     }
   }
 
+  // =========================================================================
+  // CANVAS ART — castle, cannon, and monster shapes. No image assets; every
+  // creature is body + eyes + feet drawn with primitives, animated with a
+  // walking bob, an occasional blink, and a squash-then-pop death animation.
+  // =========================================================================
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawStar(ctx, cx, cy, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const angle = -Math.PI / 2 + i * (Math.PI * 2 / 5);
+      const angle2 = angle + Math.PI / 5;
+      const xOuter = cx + Math.cos(angle) * r, yOuter = cy + Math.sin(angle) * r;
+      const xInner = cx + Math.cos(angle2) * r * 0.4, yInner = cy + Math.sin(angle2) * r * 0.4;
+      if (i === 0) ctx.moveTo(xOuter, yOuter); else ctx.lineTo(xOuter, yOuter);
+      ctx.lineTo(xInner, yInner);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawEyes(ctx, spacing, eyeY, eyeR, isBlinking) {
+    ctx.fillStyle = "#fff";
+    [-spacing, spacing].forEach((dx) => {
+      ctx.beginPath();
+      ctx.ellipse(dx, eyeY, eyeR, isBlinking ? eyeR * 0.15 : eyeR, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    if (!isBlinking) {
+      ctx.fillStyle = "#222";
+      [-spacing, spacing].forEach((dx) => {
+        ctx.beginPath();
+        ctx.arc(dx, eyeY, eyeR * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  }
+
+  function drawCastle(ctx, rect) {
+    const g = getCastleGeometry(rect);
+    // main wall with a simple brick texture
+    ctx.fillStyle = "#9a9a9a";
+    ctx.fillRect(g.wallX, g.wallY, g.wallWidth, g.wallHeight);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 1;
+    const rowH = 18;
+    const rows = Math.ceil(g.wallHeight / rowH);
+    for (let row = 0; row <= rows; row++) {
+      const y = g.wallY + row * rowH;
+      ctx.beginPath(); ctx.moveTo(g.wallX, y); ctx.lineTo(g.wallX + g.wallWidth, y); ctx.stroke();
+    }
+    for (let row = 0; row < rows; row++) {
+      const y = g.wallY + row * rowH;
+      const offset = row % 2 === 0 ? 0 : 15;
+      for (let bx = g.wallX + offset; bx < g.wallX + g.wallWidth; bx += 30) {
+        ctx.beginPath(); ctx.moveTo(bx, y); ctx.lineTo(bx, y + rowH); ctx.stroke();
+      }
+    }
+    // battlements along the top of the wall
+    ctx.fillStyle = "#9a9a9a";
+    const crenelCount = 5;
+    const crenelW = g.wallWidth / (crenelCount * 2 - 1);
+    for (let i = 0; i < crenelCount; i++) {
+      ctx.fillRect(g.wallX + i * crenelW * 2, g.wallY - 14, crenelW, 14);
+    }
+    // tower
+    ctx.fillStyle = "#8a8a8a";
+    ctx.fillRect(g.towerX, g.towerY, g.towerWidth, g.towerHeight);
+    const towerRows = Math.ceil(g.towerHeight / rowH);
+    for (let row = 0; row <= towerRows; row++) {
+      const y = g.towerY + row * rowH;
+      ctx.beginPath(); ctx.moveTo(g.towerX, y); ctx.lineTo(g.towerX + g.towerWidth, y); ctx.stroke();
+    }
+    ctx.fillStyle = "#8a8a8a";
+    const towerCrenelCount = 3;
+    const towerCrenelW = g.towerWidth / (towerCrenelCount * 2 - 1);
+    for (let i = 0; i < towerCrenelCount; i++) {
+      ctx.fillRect(g.towerX + i * towerCrenelW * 2, g.towerY - 12, towerCrenelW, 12);
+    }
+    // flag
+    ctx.strokeStyle = "#5a3a1a"; ctx.lineWidth = 3;
+    const flagPoleX = g.towerX + g.towerWidth * 0.5;
+    ctx.beginPath(); ctx.moveTo(flagPoleX, g.towerY - 12); ctx.lineTo(flagPoleX, g.towerY - 40); ctx.stroke();
+    ctx.fillStyle = "#e05a5a";
+    ctx.beginPath();
+    ctx.moveTo(flagPoleX, g.towerY - 40);
+    ctx.lineTo(flagPoleX + 22, g.towerY - 33);
+    ctx.lineTo(flagPoleX, g.towerY - 26);
+    ctx.closePath();
+    ctx.fill();
+    // arched door at the base of the wall
+    ctx.fillStyle = "#5a3a1a";
+    const doorW = g.wallWidth * 0.3, doorH = g.wallHeight * 0.35;
+    const doorX = g.wallX + g.wallWidth * 0.25;
+    const doorY = g.groundY - doorH;
+    ctx.beginPath();
+    ctx.moveTo(doorX, doorY + doorH);
+    ctx.lineTo(doorX, doorY + doorH * 0.3);
+    ctx.quadraticCurveTo(doorX, doorY, doorX + doorW / 2, doorY);
+    ctx.quadraticCurveTo(doorX + doorW, doorY, doorX + doorW, doorY + doorH * 0.3);
+    ctx.lineTo(doorX + doorW, doorY + doorH);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawCannon(ctx, muzzle, aimAngle, recoil) {
+    ctx.save();
+    ctx.translate(muzzle.x, muzzle.y);
+    ctx.fillStyle = "#3a2a1a";
+    ctx.beginPath(); ctx.arc(0, 4, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.rotate(aimAngle);
+    const recoilOffset = -recoil * 8;
+    ctx.fillStyle = "#333";
+    roundRectPath(ctx, recoilOffset - 2, -7, 36, 14, 6);
+    ctx.fill();
+    ctx.fillStyle = "#222";
+    ctx.beginPath(); ctx.arc(recoilOffset, 0, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSlime(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-r, r * 0.3);
+    ctx.quadraticCurveTo(-r, -r * 0.9, 0, -r * 0.9);
+    ctx.quadraticCurveTo(r, -r * 0.9, r, r * 0.3);
+    ctx.quadraticCurveTo(r, r, 0, r);
+    ctx.quadraticCurveTo(-r, r, -r, r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.35, r * 0.55, r * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawEyes(ctx, r * 0.32, -r * 0.15, r * 0.18, isBlinking);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.ellipse(-r * 0.35, r * 0.95, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.35, r * 0.95, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawGoblin(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.moveTo(-r * 0.8, -r * 0.3); ctx.lineTo(-r * 1.3, -r * 0.9); ctx.lineTo(-r * 0.5, -r * 0.6); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.8, -r * 0.3); ctx.lineTo(r * 1.3, -r * 0.9); ctx.lineTo(r * 0.5, -r * 0.6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.moveTo(-r * 0.15, r * 0.35); ctx.lineTo(-r * 0.05, r * 0.55); ctx.lineTo(-r * 0.25, r * 0.55); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.15, r * 0.35); ctx.lineTo(r * 0.05, r * 0.55); ctx.lineTo(r * 0.25, r * 0.55); ctx.closePath(); ctx.fill();
+    drawEyes(ctx, r * 0.3, -r * 0.1, r * 0.16, isBlinking);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.ellipse(-r * 0.35, r * 0.85, r * 0.2, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.35, r * 0.85, r * 0.2, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawRobot(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.strokeStyle = accent; ctx.lineWidth = size * 0.05;
+    ctx.beginPath(); ctx.moveTo(0, -r * 0.95); ctx.lineTo(0, -r * 1.3); ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(0, -r * 1.3, r * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    roundRectPath(ctx, -r * 0.85, -r * 0.9, r * 1.7, r * 1.8, r * 0.25);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    roundRectPath(ctx, -r * 0.6, -r * 0.55, r * 1.2, r * 0.85, r * 0.15);
+    ctx.fill();
+    drawEyes(ctx, r * 0.28, -r * 0.15, r * 0.14, isBlinking);
+    ctx.fillStyle = accent;
+    roundRectPath(ctx, -r * 0.75, r * 0.75, r * 0.6, r * 0.3, r * 0.1); ctx.fill();
+    roundRectPath(ctx, r * 0.15, r * 0.75, r * 0.6, r * 0.3, r * 0.1); ctx.fill();
+  }
+
+  function drawOwl(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.7); ctx.lineTo(-r * 0.7, -r * 1.15); ctx.lineTo(-r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.5, -r * 0.7); ctx.lineTo(r * 0.7, -r * 1.15); ctx.lineTo(r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.ellipse(-r * 0.75, r * 0.1, r * 0.28, r * 0.5, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.75, r * 0.1, r * 0.28, r * 0.5, 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.85, r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f0a840";
+    ctx.beginPath(); ctx.moveTo(-r * 0.12, r * 0.05); ctx.lineTo(r * 0.12, r * 0.05); ctx.lineTo(0, r * 0.3); ctx.closePath(); ctx.fill();
+    drawEyes(ctx, r * 0.32, -r * 0.15, r * 0.26, isBlinking);
+  }
+
+  function drawBook(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.fillStyle = color;
+    roundRectPath(ctx, -r * 0.8, -r * 0.95, r * 1.6, r * 1.9, r * 0.12); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.fillRect(-r * 0.06, -r * 0.95, r * 0.12, r * 1.9);
+    ctx.fillStyle = "#fdf6e3";
+    ctx.fillRect(-r * 0.65, r * 0.75, r * 0.4, r * 0.15);
+    ctx.fillRect(r * 0.25, r * 0.75, r * 0.4, r * 0.15);
+    drawEyes(ctx, r * 0.3, -r * 0.1, r * 0.16, isBlinking);
+    if (!isBlinking) {
+      ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, r * 0.25, r * 0.22, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    }
+  }
+
+  function drawDragonBoss(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(-r * 1.4, -r * 0.9); ctx.lineTo(-r * 0.9, r * 0.1); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.6, -r * 0.2); ctx.lineTo(r * 1.4, -r * 0.9); ctx.lineTo(r * 0.9, r * 0.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f0e0a0";
+    ctx.beginPath(); ctx.moveTo(-r * 0.45, -r * 0.75); ctx.lineTo(-r * 0.65, -r * 1.25); ctx.lineTo(-r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.45, -r * 0.75); ctx.lineTo(r * 0.65, -r * 1.25); ctx.lineTo(r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.ellipse(0, r * 0.3, r * 0.5, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.3); ctx.lineTo(-r * 0.08, r * 0.5); ctx.lineTo(-r * 0.32, r * 0.5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.2, r * 0.3); ctx.lineTo(r * 0.08, r * 0.5); ctx.lineTo(r * 0.32, r * 0.5); ctx.closePath(); ctx.fill();
+    drawEyes(ctx, r * 0.32, -r * 0.1, r * 0.2, isBlinking);
+  }
+
+  function drawWizardBoss(ctx, size, color, accent, isBlinking) {
+    const r = size / 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.5, -r * 0.6);
+    ctx.lineTo(r * 0.5, -r * 0.6);
+    ctx.lineTo(r * 0.95, r * 0.9);
+    ctx.lineTo(-r * 0.95, r * 0.9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.5);
+    ctx.lineTo(r * 0.55, -r * 0.55);
+    ctx.lineTo(-r * 0.55, -r * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.55, r * 0.6, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffe066";
+    drawStar(ctx, 0, -r * 0.95, r * 0.12);
+    ctx.fillStyle = "#e8e8e8";
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.15, r * 0.4, r * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+    drawEyes(ctx, r * 0.2, -r * 0.15, r * 0.13, isBlinking);
+  }
+
+  function drawOwlKingBoss(ctx, size, color, accent, isBlinking) {
+    drawOwl(ctx, size, color, accent, isBlinking);
+    const r = size / 2;
+    ctx.fillStyle = "#ffd35c";
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.5, -r * 0.95);
+    ctx.lineTo(-r * 0.3, -r * 1.25);
+    ctx.lineTo(-r * 0.1, -r * 0.95);
+    ctx.lineTo(0, -r * 1.3);
+    ctx.lineTo(r * 0.1, -r * 0.95);
+    ctx.lineTo(r * 0.3, -r * 1.25);
+    ctx.lineTo(r * 0.5, -r * 0.95);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const MONSTER_SHAPE_DRAWERS = {
+    slime: drawSlime, goblin: drawGoblin, robot: drawRobot, owl: drawOwl, book: drawBook,
+    dragon: drawDragonBoss, wizard: drawWizardBoss, owlking: drawOwlKingBoss,
+  };
+  const BASE_MONSTER_SIZE = 46; // px "diameter" at scale 1, before per-monster/boss scale
+
+  function drawBossHpBar(ctx, m, size) {
+    const barWidth = size * 1.3;
+    const barHeight = 8;
+    const x = m.x - barWidth / 2;
+    const y = m.y - size * 0.9 - 16;
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    roundRectPath(ctx, x, y, barWidth, barHeight, 4); ctx.fill();
+    const hpFrac = Math.max(0, m.hp / m.maxHp);
+    ctx.fillStyle = "#e8590c";
+    roundRectPath(ctx, x, y, barWidth * hpFrac, barHeight, 4); ctx.fill();
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`${m.hp}/${m.maxHp}`, m.x, y - 2);
+  }
+
+  function drawMonster(ctx, m) {
+    const bob = Math.sin(Date.now() / 200 + m.bobOffset) * 4;
+    let alpha = 1, popScale = 1, squashX = 1, squashY = 1;
+    if (m.dying) {
+      const t2 = m.dieTimer / 300;
+      if (t2 < 0.25) {
+        const squashT = t2 / 0.25;
+        squashY = 1 - squashT * 0.35;
+        squashX = 1 + squashT * 0.25;
+      } else {
+        const popT = (t2 - 0.25) / 0.75;
+        popScale = 1 + popT * 0.6;
+        squashY = 0.65 + popT * 0.35;
+        squashX = 1.25 - popT * 0.25;
+        alpha = 1 - popT;
+      }
+    }
+    const renderScale = (m.scale || 1) * popScale;
+    const size = BASE_MONSTER_SIZE * renderScale;
+    const blinkCycle = (Date.now() / 1000 + m.blinkOffset / 300) % 3.2;
+    const isBlinking = !m.dying && blinkCycle > 3.0;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(m.x, m.y + bob);
+    ctx.scale(squashX, squashY);
+    const drawer = MONSTER_SHAPE_DRAWERS[m.shape] || drawSlime;
+    drawer(ctx, size, m.color, m.accent, isBlinking);
+    ctx.restore();
+
+    if (m.isBoss && !m.dying) {
+      drawBossHpBar(ctx, m, size);
+    }
+  }
+
   function render() {
     const rect = canvas.getBoundingClientRect();
     const w = rect.width, h = rect.height;
     ctx2d.clearRect(0, 0, w, h);
 
-    // background ground
+    // background sky
     const grad = ctx2d.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, "#bfe6f5");
     grad.addColorStop(1, "#d9f2c4");
@@ -1553,51 +1988,43 @@
     ctx2d.fillStyle = "#8fbf5f";
     ctx2d.fillRect(0, h * 0.75, w, h * 0.25);
 
-    // castle
-    const cx = castleX();
-    ctx2d.font = `${Math.min(80, h * 0.35)}px serif`;
-    ctx2d.textAlign = "center";
-    ctx2d.textBaseline = "middle";
-    ctx2d.fillText("🏰", cx, h * 0.5);
+    // castle + cannon (cannon aims at the closest alive monster, if any)
+    drawCastle(ctx2d, rect);
+    const muzzle = getCannonMuzzle(rect);
+    const aliveMonsters = state.monsters.filter(m => !m.dying);
+    let aimAngle = 0;
+    if (aliveMonsters.length > 0) {
+      let closest = aliveMonsters[0];
+      for (const m of aliveMonsters) { if (m.x < closest.x) closest = m; }
+      aimAngle = Math.atan2(closest.y - muzzle.y, closest.x - muzzle.x);
+    }
+    drawCannon(ctx2d, muzzle, aimAngle, state.cannonRecoil);
 
     // monsters
     for (const m of state.monsters) {
-      ctx2d.save();
-      const bob = Math.sin(Date.now() / 200 + m.bobOffset) * 4;
-      let alpha = 1, scale = 1;
-      if (m.dying) {
-        const t2 = m.dieTimer / 300;
-        alpha = 1 - t2;
-        scale = 1 + t2 * 0.5;
-      }
-      const renderScale = scale * (m.scale || 1);
-      ctx2d.globalAlpha = alpha;
-      ctx2d.font = `${40 * renderScale}px serif`;
-      ctx2d.textAlign = "center";
-      ctx2d.textBaseline = "middle";
-      ctx2d.fillText(m.emoji, m.x, m.y + bob);
-      if (m.isBoss && !m.dying) {
-        ctx2d.font = "16px sans-serif";
-        ctx2d.fillStyle = "#e8590c";
-        ctx2d.fillText(`❤ ${m.hp}/${m.maxHp}`, m.x, m.y + bob - 20 * renderScale - 8);
-      }
-      ctx2d.restore();
+      drawMonster(ctx2d, m);
     }
 
-    // arrows
-    ctx2d.save();
-    ctx2d.font = "24px serif";
-    ctx2d.textAlign = "center";
-    ctx2d.textBaseline = "middle";
-    for (const a of state.arrows) {
-      const angle = Math.atan2(a.target.y - a.y, a.target.x - a.x);
+    // cannonballs (arc up then back down toward the target using a sine offset)
+    for (const ball of state.cannonballs) {
+      const dx = ball.target.x - ball.x;
+      const dy = ball.target.y - ball.y;
+      const remainingDist = Math.sqrt(dx * dx + dy * dy);
+      const progress = Math.min(1, Math.max(0, 1 - remainingDist / ball.initialDist));
+      const arcHeight = Math.sin(progress * Math.PI) * BALANCE.CANNONBALL_ARC_HEIGHT;
       ctx2d.save();
-      ctx2d.translate(a.x, a.y);
-      ctx2d.rotate(angle);
-      ctx2d.fillText("➤", 0, 0);
+      ctx2d.translate(ball.x, ball.y - arcHeight);
+      ctx2d.rotate(ball.rotation);
+      ctx2d.fillStyle = "#2b2b2b";
+      ctx2d.beginPath();
+      ctx2d.arc(0, 0, 9, 0, Math.PI * 2);
+      ctx2d.fill();
+      ctx2d.fillStyle = "rgba(255,255,255,0.25)";
+      ctx2d.beginPath();
+      ctx2d.arc(-3, -3, 3, 0, Math.PI * 2);
+      ctx2d.fill();
       ctx2d.restore();
     }
-    ctx2d.restore();
 
     // particles
     for (const p of state.particles) {
@@ -1650,7 +2077,8 @@
     state.score = 0;
     state.wave = 1;
     state.monsters = [];
-    state.arrows = [];
+    state.cannonballs = [];
+    state.cannonRecoil = 0;
     state.particles = [];
     state.difficultyIndex = 0;
     state.correctStreak = 0;
@@ -1673,6 +2101,10 @@
   }
 
   window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 100));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", resizeCanvas);
+  }
   resizeCanvas();
   updateHeartsDisplay();
   showWorldSelect();
