@@ -559,7 +559,16 @@
     div: [{ min: 2, max: 5 }, { min: 2, max: 9 }, { min: 2, max: 12 }],
   };
 
-  const NAME_POOL_VI = ["Lan", "Minh", "An", "Hoa", "Nam", "Mai", "Huy", "Linh", "Bình", "Trang", "Long", "Chi"];
+  // Name pools carry gender so English templates can use pronouns after the
+  // first mention of a name instead of repeating it. Vietnamese templates
+  // don't need this (repeating the name reads naturally in Vietnamese), but
+  // the gender field is kept for structural symmetry between the two pools.
+  const NAME_POOL_VI = [
+    { name: "Lan", gender: "f" }, { name: "Minh", gender: "m" }, { name: "An", gender: "m" },
+    { name: "Hoa", gender: "f" }, { name: "Nam", gender: "m" }, { name: "Mai", gender: "f" },
+    { name: "Huy", gender: "m" }, { name: "Linh", gender: "f" }, { name: "Bình", gender: "m" },
+    { name: "Trang", gender: "f" }, { name: "Long", gender: "m" }, { name: "Chi", gender: "f" },
+  ];
   const ADD_TEMPLATES_VI = [
     (name, a, b) => `${name} có ${a} viên kẹo, được cho thêm ${b} viên. Hỏi ${name} có tất cả bao nhiêu viên kẹo?`,
     (name, a, b) => `Lớp học có ${a} bạn nam và ${b} bạn nữ. Hỏi lớp có tất cả bao nhiêu bạn?`,
@@ -582,27 +591,38 @@
   ];
 
   // English templates are written as natural word problems, not translated
-  // from the Vietnamese set above.
-  const NAME_POOL_EN = ["Emma", "Liam", "Noah", "Olivia", "Ava", "Ethan", "Mia", "Lucas", "Sophia", "Jack", "Isla", "Leo"];
+  // from the Vietnamese set above. Templates that mention the name twice use
+  // a pronoun (p) for the second mention, matched to the name's gender.
+  const NAME_POOL_EN = [
+    { name: "Emma", gender: "f" }, { name: "Liam", gender: "m" }, { name: "Noah", gender: "m" },
+    { name: "Olivia", gender: "f" }, { name: "Ava", gender: "f" }, { name: "Ethan", gender: "m" },
+    { name: "Mia", gender: "f" }, { name: "Lucas", gender: "m" }, { name: "Sophia", gender: "f" },
+    { name: "Jack", gender: "m" }, { name: "Isla", gender: "f" }, { name: "Leo", gender: "m" },
+  ];
+  function pronounsFor(gender) {
+    return gender === "f" ? { subj: "she", obj: "her", poss: "her" } : { subj: "he", obj: "him", poss: "his" };
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
   const ADD_TEMPLATES_EN = [
-    (name, a, b) => `${name} has ${a} candies. Then ${name} gets ${b} more. How many candies does ${name} have now?`,
+    (name, a, b, p) => `${name} has ${a} candies. Then ${p.subj} gets ${b} more. How many candies does ${p.subj} have now?`,
     (name, a, b) => `There are ${a} boys and ${b} girls in the class. How many students are there in total?`,
-    (name, a, b) => `${name} picked ${a} apples in the morning and ${b} apples in the afternoon. How many apples in all?`,
+    (name, a, b, p) => `${name} picked ${a} apples in the morning and ${b} more in the afternoon. How many apples did ${p.subj} pick in all?`,
   ];
   const SUB_TEMPLATES_EN = [
-    (name, a, b) => `${name} has ${a} candies. ${name} gives ${b} to a friend. How many candies are left?`,
+    (name, a, b, p) => `${name} has ${a} candies. ${cap(p.subj)} gives ${b} to ${p.poss} friend. How many candies are left?`,
     (name, a, b) => `There were ${a} birds on a branch. ${b} of them flew away. How many birds are left?`,
-    (name, a, b) => `${name} had ${a} notebooks and used ${b} of them. How many notebooks does ${name} have left?`,
+    (name, a, b, p) => `${name} had ${a} notebooks and used ${b} of them. How many notebooks does ${p.subj} have left?`,
   ];
   const MUL_TEMPLATES_EN = [
-    (name, a, b) => `${name} has ${a} boxes of pencils, with ${b} pencils in each box. How many pencils in total?`,
-    (name, a, b) => `There are ${a} baskets of apples, with ${b} apples in each basket. How many apples in total?`,
-    (name, a, b) => `${name} set up ${a} rows of chairs, with ${b} chairs in each row. How many chairs in total?`,
+    (name, a, b, p) => `${name} has ${a} boxes of pencils, with ${b} pencils in each box. How many pencils does ${p.subj} have in total?`,
+    (name, a, b) => `There are ${a} baskets of apples, with ${b} apples in each basket. How many apples are there in total?`,
+    (name, a, b, p) => `${name} set up ${a} rows of chairs, with ${b} chairs in each row. How many chairs did ${p.subj} set up in total?`,
   ];
   const DIV_TEMPLATES_EN = [
     (name, a, b) => `${name} has ${a} candies and shares them equally among ${b} friends. How many candies does each friend get?`,
     (name, a, b) => `There are ${a} oranges shared equally into ${b} baskets. How many oranges are in each basket?`,
-    (name, a, b) => `${name} has ${a} cookies arranged equally on ${b} plates. How many cookies are on each plate?`,
+    (name, a, b) => `${name} has ${a} cookies and arranges them equally on ${b} plates. How many cookies are on each plate?`,
   ];
 
   const WORD_TEMPLATES = {
@@ -614,36 +634,42 @@
     return arr[randInt(0, arr.length - 1)];
   }
 
+  // Number constraints audited for degenerate word problems: addition/
+  // multiplication/division bands all have a minimum of 2+ (so no "0 more",
+  // "shares among 1 group", or "times 0/1" cases). Subtraction/giving-away
+  // needs an explicit constraint below since b would otherwise range up to a.
   function generateWordProblem(levelConfig, tierIndex) {
     const op = pickFrom(levelConfig.opSet);
     const templates = WORD_TEMPLATES[currentLang];
-    const name = pickFrom(templates.names);
+    const nameEntry = pickFrom(templates.names);
+    const name = nameEntry.name;
+    const p = pronounsFor(nameEntry.gender);
     let a, b, answer, text;
     if (op === "+") {
       const band = WORD_BANDS.add[tierIndex];
       a = randInt(band.min, band.max);
       b = randInt(band.min, band.max);
       answer = a + b;
-      text = pickFrom(templates.add)(name, a, b);
+      text = pickFrom(templates.add)(name, a, b, p);
     } else if (op === "-") {
       const band = WORD_BANDS.sub[tierIndex];
       a = randInt(band.min, band.max);
-      b = randInt(1, a);
+      b = randInt(1, a - 1); // strictly less than a, so the result is always > 0 and a != b
       answer = a - b;
-      text = pickFrom(templates.sub)(name, a, b);
+      text = pickFrom(templates.sub)(name, a, b, p);
     } else if (op === "*") {
       const band = WORD_BANDS.mul[tierIndex];
       a = randInt(band.min, band.max);
       b = randInt(band.min, band.max);
       answer = a * b;
-      text = pickFrom(templates.mul)(name, a, b);
+      text = pickFrom(templates.mul)(name, a, b, p);
     } else {
       const band = WORD_BANDS.div[tierIndex];
       b = randInt(band.min, band.max);
       const quotient = randInt(band.min, band.max);
       a = b * quotient;
       answer = quotient;
-      text = pickFrom(templates.div)(name, a, b);
+      text = pickFrom(templates.div)(name, a, b, p);
     }
     return { isWordProblem: true, text, answer };
   }
