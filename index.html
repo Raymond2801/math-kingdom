@@ -63,7 +63,7 @@
     gap: 8px;
     width: 100%;
   }
-  #hearts, #score, #waveInfo, #quickUnlockProgress {
+  #hearts, #score, #waveInfo, #quickUnlockProgress, #streakDisplay {
     font-size: clamp(13px, 3vw, 22px);
     font-weight: bold;
     color: #3b2a1a;
@@ -315,6 +315,7 @@
     <div id="hud">
       <div id="hudNormal">
         <div id="hearts">❤️❤️❤️</div>
+        <div id="streakDisplay" style="visibility:hidden;">🔥 x0</div>
         <div id="waveInfo">Select a World</div>
         <div id="score">Score: 0</div>
       </div>
@@ -396,8 +397,13 @@
     BOSS_HP: 3,                   // correct answers needed to defeat the boss
     BOSS_KILL_BONUS: 30,          // extra score on top of per-hit score when boss dies
     BOSS_SCALE: 1.7,              // boss render size multiplier vs a regular monster
-    BOSS_SPEED_MULTIPLIER: 0.8,   // boss moves a bit slower than regular monsters despite being tougher
+    BOSS_SPEED_MULTIPLIER: 0.9,   // boss moves a bit slower than regular monsters despite being tougher
     QUICK_UNLOCK_STREAK_REQUIRED: 3, // consecutive correct sample answers to skip-unlock a world
+    HP_SPEED_PENALTY_PER_EXTRA_HP: 0.35, // multi-HP dragons move this fraction slower per HP above 1
+    CANNON_STREAK_TIER1: 5,       // consecutive correct answers to level up the cannon (bigger barrel, faster ball)
+    CANNON_STREAK_TIER2: 10,      // consecutive correct answers to unlock the second cannon
+    CANNON_TIER1_SPEED_MULT: 1.3, // cannonball speed multiplier once the cannon is leveled up
+    CANNON_TIER1_BARREL_SCALE: 1.3, // cannon barrel render scale once leveled up
   };
 
   // =========================================================================
@@ -437,6 +443,8 @@
       quickUnlockProgressLabel: "Mở khóa nhanh",
       correctInARow: "đúng liên tiếp",
       quickUnlockWrong: "Sai rồi! Đáp án là {ans}. Thử lại nhé!",
+      cannonUpgraded1: "Đại bác nâng cấp! 💪",
+      cannonUpgraded2: "Đại bác thứ hai xuất hiện! 🎉",
       worlds: {
         1: "Vương Quốc Cộng Trừ",
         2: "Vương quốc Phép Nhân",
@@ -482,6 +490,8 @@
       quickUnlockProgressLabel: "Quick Unlock",
       correctInARow: "correct in a row",
       quickUnlockWrong: "Not quite! The answer was {ans}. Try again!",
+      cannonUpgraded1: "Cannon upgraded! 💪",
+      cannonUpgraded2: "Second cannon unlocked! 🎉",
       worlds: {
         1: "Addition & Subtraction Kingdom",
         2: "Multiplication Kingdom",
@@ -531,7 +541,7 @@
       levels: [
         { id: 1, emoji: "🏘️", kind: "arithmetic", maxSum: 10, allowSubtraction: false, monsterSpeedMultiplier: 1.0, hasBoss: false },
         { id: 2, emoji: "🌲", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 3, emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 1.35, hasBoss: true },
+        { id: 3, emoji: "🐉", kind: "arithmetic", maxSum: 20, allowSubtraction: true, monsterSpeedMultiplier: 0.7, hasBoss: true },
       ],
     },
     {
@@ -540,7 +550,7 @@
       levels: [
         { id: 1, emoji: "🛒", kind: "multiplication", tables: [2, 3, 4, 5], monsterSpeedMultiplier: 1.0, hasBoss: false },
         { id: 2, emoji: "⚙️", kind: "multiplication", tables: [6, 7, 8, 9], monsterSpeedMultiplier: 1.0, hasBoss: false },
-        { id: 3, emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 1.35, hasBoss: true },
+        { id: 3, emoji: "🔮", kind: "mixed_muldiv", tables: [2, 3, 4, 5, 6, 7, 8, 9], monsterSpeedMultiplier: 0.7, hasBoss: true },
       ],
     },
     {
@@ -559,34 +569,59 @@
   }
 
   // =========================================================================
-  // MONSTER VISUAL DESIGNS — Canvas-drawn creatures, no image assets. Regular
-  // monsters cycle by wave (like the old emoji set did); each world's boss
-  // (level 3, final wave) uses its own bigger design with an HP bar.
+  // DRAGON VISUAL DESIGNS — Canvas-drawn, no image assets. Every monster in
+  // every world is a dragon; species differ by silhouette (wing style +
+  // horn style) and color palette so kids can tell them apart at a glance.
+  // Regular monsters cycle by wave; each world's boss (level 3, final wave)
+  // uses a bigger, more intense variant of that world's element.
   // =========================================================================
-  const MONSTER_DESIGNS = {
-    1: [ // World 1 "Cộng Trừ": slimes and goblins
-      { shape: "slime", color: "#7ed957", accent: "#4a9e2f" },
-      { shape: "slime", color: "#7b6cf0", accent: "#5443c9" },
-      { shape: "goblin", color: "#8fae4a", accent: "#5c7a2e" },
-      { shape: "goblin", color: "#c98a4a", accent: "#8a5a26" },
-    ],
-    2: [ // World 2 "Phép Nhân": factory robots
-      { shape: "robot", color: "#b0b8c0", accent: "#5a6570" },
-      { shape: "robot", color: "#f0a840", accent: "#a86e20" },
-      { shape: "robot", color: "#6ec6e8", accent: "#2f7d9e" },
-    ],
-    3: [ // World 3 "Toán Đố": owls and books
-      { shape: "owl", color: "#a8794a", accent: "#6b4a28" },
-      { shape: "owl", color: "#8a8fae", accent: "#54597a" },
-      { shape: "book", color: "#e05a5a", accent: "#a83232" },
-      { shape: "book", color: "#4a8ae0", accent: "#2f5aa8" },
-    ],
+  const DRAGON_SPECIES = {
+    // World 1 "Cộng Trừ": small cute dragons
+    grass:     { body: "#6ec766", belly: "#bfe89a", horn: "#3f7a3a", hornType: "leaf",    wing: "membrane",   wingColor: "#4a9e42" },
+    water:     { body: "#4a90d9", belly: "#bfe3ff", horn: "#2a5a94", hornType: "leaf",    wing: "membrane",   wingColor: "#3a78c0" },
+    fireBaby:  { body: "#e35b4f", belly: "#ffcf9e", horn: "#a83226", hornType: "leaf",    wing: "membrane",   wingColor: "#c94a3a", fireGlow: true },
+    // World 2 "Phép Nhân": mechanical / armored dragons
+    gear:      { body: "#9aa5ad", belly: "#d8dee3", horn: "#5a6570", hornType: "antenna", wing: "mechanical", wingColor: "#6b7580" },
+    steel:     { body: "#7d8a97", belly: "#c3ccd4", horn: "#3f4a54", hornType: "antenna", wing: "mechanical", wingColor: "#4a5560" },
+    // World 3 "Toán Đố": mystic dragons
+    owlWinged: { body: "#8a6a4a", belly: "#d9bd8f", horn: "#5a4028", hornType: "tuft",    wing: "feather",    wingColor: "#6b4e30" },
+    rune:      { body: "#7a4ae0", belly: "#c9b3ff", horn: "#4a2896", hornType: "crystal", wing: "membrane",   wingColor: "#5c34b0", runeGlow: true },
+    // Bosses: bigger, more intense variant per world (same element family)
+    fireBoss:  { body: "#c9382a", belly: "#ffb066", horn: "#7a1f16", hornType: "leaf",    wing: "membrane",   wingColor: "#a8291d", fireGlow: true },
+    steelBoss: { body: "#5c6a78", belly: "#a8b4bd", horn: "#2a333c", hornType: "antenna", wing: "mechanical", wingColor: "#333d46" },
+    runeBoss:  { body: "#9a5cf0", belly: "#e0ccff", horn: "#5c2fa0", hornType: "crystal", wing: "membrane",   wingColor: "#7c3fd0", runeGlow: true },
   };
-  const BOSS_DESIGNS = {
-    1: { shape: "dragon", color: "#5a9e3f", accent: "#2f6e1f" },
-    2: { shape: "wizard", color: "#7a4ae0", accent: "#4a2896" },
-    3: { shape: "owlking", color: "#c9a24a", accent: "#8a6a1f" },
+  const DRAGON_SPECIES_BY_WORLD = {
+    1: ["grass", "water", "fireBaby"],
+    2: ["gear", "steel"],
+    3: ["owlWinged", "rune"],
   };
+  const BOSS_DRAGON_SPECIES_BY_WORLD = { 1: "fireBoss", 2: "steelBoss", 3: "runeBoss" };
+
+  // Monster HP mix by level index within a world (0 = first level, 2 = boss
+  // level). Level 1 is always single-hit; later levels mix in armored (2 HP)
+  // and, in the final level, elite (3 HP) dragons.
+  const HP_DISTRIBUTION_BY_LEVEL_INDEX = [
+    [{ hp: 1, weight: 1 }],
+    [{ hp: 1, weight: 0.7 }, { hp: 2, weight: 0.3 }],
+    [{ hp: 1, weight: 0.5 }, { hp: 2, weight: 0.3 }, { hp: 3, weight: 0.2 }],
+  ];
+  // Wave 5 of the final level also spawns the boss, which is already that
+  // wave's HP challenge — regular dragons alongside it stay single-hit so the
+  // boss fight doesn't stack with extra multi-HP pressure at the same time.
+  const HP_DISTRIBUTION_LEVEL3_BOSS_WAVE = [{ hp: 1, weight: 1 }];
+  function pickWeighted(options) {
+    const total = options.reduce((s, o) => s + o.weight, 0);
+    let r = Math.random() * total;
+    for (const o of options) {
+      if (r < o.weight) return o.hp;
+      r -= o.weight;
+    }
+    return options[options.length - 1].hp;
+  }
+  function hpSpeedMultiplier(hp) {
+    return 1 - BALANCE.HP_SPEED_PENALTY_PER_EXTRA_HP * (hp - 1);
+  }
 
   // =========================================================================
   // QUESTION GENERATION — dispatches on level.kind
@@ -887,6 +922,7 @@
       correct: function () { tone(660, 0.1, "sine", 0.15, 0.001, 0); tone(880, 0.12, "sine", 0.15, 0.001, 0.08); },
       heartLost: function () { tone(140, 0.3, "sawtooth", 0.25, 0.001, 0); tone(100, 0.35, "sawtooth", 0.2, 0.001, 0.1); },
       tierUp: function () { tone(523, 0.1, "sine", 0.15, 0.001, 0); tone(659, 0.1, "sine", 0.15, 0.001, 0.1); tone(784, 0.15, "sine", 0.15, 0.001, 0.2); },
+      upgrade: function () { tone(700, 0.08, "square", 0.18, 0.001, 0); tone(1000, 0.08, "square", 0.15, 0.001, 0.08); tone(1300, 0.14, "square", 0.15, 0.001, 0.16); },
       victory: function () {
         [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, "sine", 0.2, 0.001, i * 0.15));
       },
@@ -947,6 +983,9 @@
     isBossWave: false,
     quickUnlockWorldId: null,
     quickUnlockStreak: 0,
+    cannonStreak: 0,          // consecutive correct answers, drives cannon upgrades
+    cannonLevel: 0,           // 0 = base, 1 = upgraded barrel, 2 = dual cannon
+    pendingCannonDowngrade: false, // set on a wrong answer; applied at the next wave boundary, not instantly
   };
 
   function currentLevel() {
@@ -987,6 +1026,15 @@
       Audio_.tierUp();
       showFeedback(t("niceStreak"), "#2b6cb0");
     }
+
+    state.cannonStreak++;
+    updateStreakDisplay();
+    const newCannonLevel = cannonLevelForStreak(state.cannonStreak);
+    if (newCannonLevel > state.cannonLevel) {
+      state.cannonLevel = newCannonLevel;
+      state.pendingCannonDowngrade = false;
+      triggerCannonUpgradeEffect(newCannonLevel);
+    }
   }
 
   function onWrongAnswer() {
@@ -995,6 +1043,49 @@
     if (state.wrongStreak >= BALANCE.STREAK_DOWN_THRESHOLD && state.difficultyIndex > 0) {
       state.difficultyIndex--;
       state.wrongStreak = 0;
+    }
+
+    state.cannonStreak = 0;
+    state.pendingCannonDowngrade = true;
+    updateStreakDisplay();
+  }
+
+  // =========================================================================
+  // CANNON UPGRADES — driven by a consecutive-correct streak, independent of
+  // the difficulty-tier streak above. Upgrades apply the instant they're
+  // earned; a wrong answer resets the streak but the cannon itself only
+  // downgrades at the next wave boundary (see startWave), so one mistake
+  // doesn't feel like it costs you the upgrade immediately.
+  // =========================================================================
+  function cannonLevelForStreak(streak) {
+    if (streak >= BALANCE.CANNON_STREAK_TIER2) return 2;
+    if (streak >= BALANCE.CANNON_STREAK_TIER1) return 1;
+    return 0;
+  }
+
+  function updateStreakDisplay() {
+    const el = document.getElementById("streakDisplay");
+    if (state.cannonStreak > 0) {
+      el.textContent = `🔥 x${state.cannonStreak}`;
+      el.style.visibility = "visible";
+    } else {
+      el.style.visibility = "hidden";
+    }
+  }
+
+  function triggerCannonUpgradeEffect(level) {
+    Audio_.upgrade();
+    showFeedback(level >= 2 ? t("cannonUpgraded2") : t("cannonUpgraded1"), "#e8a400");
+    const rect = canvas.getBoundingClientRect();
+    const muzzle = getCannonMuzzle(rect);
+    for (let i = 0; i < 16; i++) {
+      state.particles.push({
+        x: muzzle.x, y: muzzle.y,
+        vx: (Math.random() - 0.5) * 7,
+        vy: (Math.random() - 0.5) * 7 - 2,
+        life: 30,
+        color: `hsl(${45 + Math.random() * 15}, 95%, ${60 + Math.random() * 20}%)`,
+      });
     }
   }
 
@@ -1036,6 +1127,15 @@
     state.waveInProgress = true;
     document.getElementById("waveInfo").textContent =
       `${world.emoji} ${t("levelLabel")} ${lvl.id}: ${levelName(world.id, lvl.id)} — ${t("waveLabel")} ${waveNum}/${BALANCE.TOTAL_WAVES}`;
+
+    // Cannon downgrades only take effect at a wave boundary, never mid-wave.
+    if (state.pendingCannonDowngrade) {
+      const recomputed = cannonLevelForStreak(state.cannonStreak);
+      if (recomputed < state.cannonLevel) {
+        state.cannonLevel = recomputed;
+      }
+      state.pendingCannonDowngrade = false;
+    }
   }
 
   function spawnMonster() {
@@ -1044,20 +1144,27 @@
     const lvl = currentLevel();
     const isBoss = state.isBossWave && state.monstersRemainingToSpawn === 1;
     const spawnXFraction = lvl.spawnXFraction || BALANCE.SPAWN_X_FRACTION;
-    const laneY = rect.height * (0.25 + Math.random() * 0.5);
-    const designs = MONSTER_DESIGNS[world.id];
-    const design = isBoss ? BOSS_DESIGNS[world.id] : designs[(state.wave - 1) % designs.length];
+    const speciesList = DRAGON_SPECIES_BY_WORLD[world.id];
+    const speciesKey = isBoss ? BOSS_DRAGON_SPECIES_BY_WORLD[world.id] : speciesList[(state.wave - 1) % speciesList.length];
+    const isBossWaveOfFinalLevel = state.levelIndex === 2 && state.isBossWave;
+    const hpDistribution = isBossWaveOfFinalLevel ? HP_DISTRIBUTION_LEVEL3_BOSS_WAVE : HP_DISTRIBUTION_BY_LEVEL_INDEX[state.levelIndex];
+    const hp = isBoss ? BALANCE.BOSS_HP : pickWeighted(hpDistribution);
+    const scale = isBoss ? BALANCE.BOSS_SCALE : 1;
+    const size = BASE_MONSTER_SIZE * scale;
+    // Dragons walk along the grass line, not scattered at random heights —
+    // groundY matches the same line the castle/ground strip is drawn on, with
+    // a tiny per-monster jitter so they don't all form a perfectly flat row.
+    const groundY = getCastleGeometry(rect).groundY;
+    const jitter = randInt(-4, 4);
     state.monsters.push({
       x: rect.width * spawnXFraction,
-      y: isBoss ? rect.height * 0.5 : laneY,
-      shape: design.shape,
-      color: design.color,
-      accent: design.accent,
-      speed: speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : 1),
-      hp: isBoss ? BALANCE.BOSS_HP : 1,
-      maxHp: isBoss ? BALANCE.BOSS_HP : 1,
+      y: groundY - size * 0.4 + jitter,
+      speciesKey,
+      speed: speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : hpSpeedMultiplier(hp)),
+      hp,
+      maxHp: hp,
       isBoss: isBoss,
-      scale: isBoss ? BALANCE.BOSS_SCALE : 1,
+      scale,
       dying: false,
       dieTimer: 0,
       bobOffset: Math.random() * Math.PI * 2,
@@ -1088,6 +1195,12 @@
     return { x: g.wallX + g.wallWidth * 0.55, y: g.wallY - 6 };
   }
 
+  // Second cannon, unlocked at a 10-answer streak, sits up on the tower.
+  function getSecondCannonMuzzle(rect) {
+    const g = getCastleGeometry(rect);
+    return { x: g.towerX + g.towerWidth * 0.5, y: g.towerY - 6 };
+  }
+
   function castleX() {
     const rect = canvas.getBoundingClientRect();
     const g = getCastleGeometry(rect);
@@ -1097,22 +1210,49 @@
   // =========================================================================
   // SHOOTING
   // =========================================================================
+  // Targeting priority is shortest time-to-castle (remaining distance / own
+  // speed), not raw distance. Sorting by distance alone lets a slow, tanky
+  // multi-HP dragon get perpetually bypassed by faster newcomers that spawn
+  // later but overtake it — "closest" looks locally correct at every instant,
+  // yet the slow one can go untouched for its whole approach and reach the
+  // castle. Time-to-impact fixes that: whoever will actually arrive soonest
+  // is engaged first. Ties (near-simultaneous arrival) favor lower remaining
+  // HP, so nearly-dead dragons get finished off rather than left dangling.
+  function sortByThreat(monsters) {
+    const cx = castleX();
+    return monsters.slice().sort((a, b) => {
+      const ta = (a.x - cx) / a.speed;
+      const tb = (b.x - cx) / b.speed;
+      if (Math.abs(ta - tb) > 1e-6) return ta - tb;
+      return a.hp - b.hp;
+    });
+  }
+
+  // Below cannonLevel 2 this fires one cannonball at the most urgent dragon,
+  // same as always. At level 2 (10-streak) each correct answer fires from
+  // both cannons at once, targeting the two most urgent dragons.
   function fireAtClosestMonster() {
     const alive = state.monsters.filter(m => !m.dying);
     if (alive.length === 0) return false;
-    let closest = alive[0];
-    for (const m of alive) {
-      if (m.x < closest.x) closest = m;
-    }
+    const sorted = sortByThreat(alive);
     const rect = canvas.getBoundingClientRect();
-    const muzzle = getCannonMuzzle(rect);
-    const dist = Math.max(1, Math.hypot(closest.x - muzzle.x, closest.y - muzzle.y));
-    state.cannonballs.push({
-      x: muzzle.x,
-      y: muzzle.y,
-      target: closest,
-      initialDist: dist,
-      rotation: 0,
+    const dual = state.cannonLevel >= 2;
+    const targets = dual ? sorted.slice(0, 2) : sorted.slice(0, 1);
+    const muzzles = [getCannonMuzzle(rect)];
+    if (dual) muzzles.push(getSecondCannonMuzzle(rect));
+    const speedMult = state.cannonLevel >= 1 ? BALANCE.CANNON_TIER1_SPEED_MULT : 1;
+
+    targets.forEach((target, i) => {
+      const muzzle = muzzles[i] || muzzles[0];
+      const dist = Math.max(1, Math.hypot(target.x - muzzle.x, target.y - muzzle.y));
+      state.cannonballs.push({
+        x: muzzle.x,
+        y: muzzle.y,
+        target,
+        initialDist: dist,
+        rotation: 0,
+        speedMult,
+      });
     });
     state.cannonRecoil = 1;
     Audio_.shoot();
@@ -1200,6 +1340,9 @@
   function setHudMode(mode) {
     document.getElementById("hudNormal").style.display = mode === "quiz" ? "none" : "flex";
     document.getElementById("quickUnlockBar").style.display = mode === "quiz" ? "flex" : "none";
+    if (mode !== "playing") {
+      document.getElementById("streakDisplay").style.visibility = "hidden";
+    }
   }
 
   // outcome: "gameover" | "levelComplete" | "worldComplete" | "victory"
@@ -1589,12 +1732,17 @@
       const dx = ball.target.x - ball.x;
       const dy = ball.target.y - ball.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 15) {
+      const speed = BALANCE.CANNONBALL_SPEED * (ball.speedMult || 1) * (dt / 16.6667);
+      // Register a hit whenever this frame's movement would reach or pass the
+      // target, not just when already within 15px — a large dt (a throttled
+      // background tab, a slow device) can otherwise let a fast cannonball
+      // overshoot its target in a single step and never register the hit,
+      // wasting the shot while the dragon keeps marching untouched.
+      if (dist < 15 || speed >= dist) {
         hitMonster(ball.target);
-        spawnImpactBurst(ball.x, ball.y);
+        spawnImpactBurst(ball.target.x, ball.target.y);
         state.cannonballs.splice(i, 1);
       } else {
-        const speed = BALANCE.CANNONBALL_SPEED * (dt / 16.6667);
         ball.x += (dx / dist) * speed;
         ball.y += (dy / dist) * speed;
         ball.rotation += 0.25 * (dt / 16.6667);
@@ -1654,37 +1802,6 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
-  }
-
-  function drawStar(ctx, cx, cy, r) {
-    ctx.beginPath();
-    for (let i = 0; i < 5; i++) {
-      const angle = -Math.PI / 2 + i * (Math.PI * 2 / 5);
-      const angle2 = angle + Math.PI / 5;
-      const xOuter = cx + Math.cos(angle) * r, yOuter = cy + Math.sin(angle) * r;
-      const xInner = cx + Math.cos(angle2) * r * 0.4, yInner = cy + Math.sin(angle2) * r * 0.4;
-      if (i === 0) ctx.moveTo(xOuter, yOuter); else ctx.lineTo(xOuter, yOuter);
-      ctx.lineTo(xInner, yInner);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function drawEyes(ctx, spacing, eyeY, eyeR, isBlinking) {
-    ctx.fillStyle = "#fff";
-    [-spacing, spacing].forEach((dx) => {
-      ctx.beginPath();
-      ctx.ellipse(dx, eyeY, eyeR, isBlinking ? eyeR * 0.15 : eyeR, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    if (!isBlinking) {
-      ctx.fillStyle = "#222";
-      [-spacing, spacing].forEach((dx) => {
-        ctx.beginPath();
-        ctx.arc(dx, eyeY, eyeR * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
   }
 
   function drawCastle(ctx, rect) {
@@ -1754,170 +1871,161 @@
     ctx.fill();
   }
 
-  function drawCannon(ctx, muzzle, aimAngle, recoil) {
+  function drawCannon(ctx, muzzle, aimAngle, recoil, barrelScale) {
+    barrelScale = barrelScale || 1;
     ctx.save();
     ctx.translate(muzzle.x, muzzle.y);
     ctx.fillStyle = "#3a2a1a";
-    ctx.beginPath(); ctx.arc(0, 4, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 4, 10 * barrelScale, 0, Math.PI * 2); ctx.fill();
     ctx.rotate(aimAngle);
     const recoilOffset = -recoil * 8;
     ctx.fillStyle = "#333";
-    roundRectPath(ctx, recoilOffset - 2, -7, 36, 14, 6);
+    roundRectPath(ctx, recoilOffset - 2, -7 * barrelScale, 36 * barrelScale, 14 * barrelScale, 6 * barrelScale);
     ctx.fill();
     ctx.fillStyle = "#222";
-    ctx.beginPath(); ctx.arc(recoilOffset, 0, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(recoilOffset, 0, 8 * barrelScale, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
-  function drawSlime(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(-r, r * 0.3);
-    ctx.quadraticCurveTo(-r, -r * 0.9, 0, -r * 0.9);
-    ctx.quadraticCurveTo(r, -r * 0.9, r, r * 0.3);
-    ctx.quadraticCurveTo(r, r, 0, r);
-    ctx.quadraticCurveTo(-r, r, -r, r * 0.3);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.35, r * 0.55, r * 0.3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    drawEyes(ctx, r * 0.32, -r * 0.15, r * 0.18, isBlinking);
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.ellipse(-r * 0.35, r * 0.95, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(r * 0.35, r * 0.95, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-  }
-
-  function drawGoblin(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.moveTo(-r * 0.8, -r * 0.3); ctx.lineTo(-r * 1.3, -r * 0.9); ctx.lineTo(-r * 0.5, -r * 0.6); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r * 0.8, -r * 0.3); ctx.lineTo(r * 1.3, -r * 0.9); ctx.lineTo(r * 0.5, -r * 0.6); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2); ctx.fill();
+  function drawDragonEye(ctx, x, y, r, isBlinking) {
     ctx.fillStyle = "#fff";
-    ctx.beginPath(); ctx.moveTo(-r * 0.15, r * 0.35); ctx.lineTo(-r * 0.05, r * 0.55); ctx.lineTo(-r * 0.25, r * 0.55); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r * 0.15, r * 0.35); ctx.lineTo(r * 0.05, r * 0.55); ctx.lineTo(r * 0.25, r * 0.55); ctx.closePath(); ctx.fill();
-    drawEyes(ctx, r * 0.3, -r * 0.1, r * 0.16, isBlinking);
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.ellipse(-r * 0.35, r * 0.85, r * 0.2, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(r * 0.35, r * 0.85, r * 0.2, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-  }
-
-  function drawRobot(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.strokeStyle = accent; ctx.lineWidth = size * 0.05;
-    ctx.beginPath(); ctx.moveTo(0, -r * 0.95); ctx.lineTo(0, -r * 1.3); ctx.stroke();
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.arc(0, -r * 1.3, r * 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = color;
-    roundRectPath(ctx, -r * 0.85, -r * 0.9, r * 1.7, r * 1.8, r * 0.25);
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, isBlinking ? r * 0.15 : r, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = accent;
-    roundRectPath(ctx, -r * 0.6, -r * 0.55, r * 1.2, r * 0.85, r * 0.15);
-    ctx.fill();
-    drawEyes(ctx, r * 0.28, -r * 0.15, r * 0.14, isBlinking);
-    ctx.fillStyle = accent;
-    roundRectPath(ctx, -r * 0.75, r * 0.75, r * 0.6, r * 0.3, r * 0.1); ctx.fill();
-    roundRectPath(ctx, r * 0.15, r * 0.75, r * 0.6, r * 0.3, r * 0.1); ctx.fill();
-  }
-
-  function drawOwl(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.7); ctx.lineTo(-r * 0.7, -r * 1.15); ctx.lineTo(-r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r * 0.5, -r * 0.7); ctx.lineTo(r * 0.7, -r * 1.15); ctx.lineTo(r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.ellipse(-r * 0.75, r * 0.1, r * 0.28, r * 0.5, -0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(r * 0.75, r * 0.1, r * 0.28, r * 0.5, 0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.85, r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#f0a840";
-    ctx.beginPath(); ctx.moveTo(-r * 0.12, r * 0.05); ctx.lineTo(r * 0.12, r * 0.05); ctx.lineTo(0, r * 0.3); ctx.closePath(); ctx.fill();
-    drawEyes(ctx, r * 0.32, -r * 0.15, r * 0.26, isBlinking);
-  }
-
-  function drawBook(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.fillStyle = color;
-    roundRectPath(ctx, -r * 0.8, -r * 0.95, r * 1.6, r * 1.9, r * 0.12); ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.fillRect(-r * 0.06, -r * 0.95, r * 0.12, r * 1.9);
-    ctx.fillStyle = "#fdf6e3";
-    ctx.fillRect(-r * 0.65, r * 0.75, r * 0.4, r * 0.15);
-    ctx.fillRect(r * 0.25, r * 0.75, r * 0.4, r * 0.15);
-    drawEyes(ctx, r * 0.3, -r * 0.1, r * 0.16, isBlinking);
     if (!isBlinking) {
-      ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(0, r * 0.25, r * 0.22, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      ctx.fillStyle = "#222";
+      ctx.beginPath(); ctx.arc(x - r * 0.25, y, r * 0.5, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  function drawDragonBoss(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(-r * 1.4, -r * 0.9); ctx.lineTo(-r * 0.9, r * 0.1); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r * 0.6, -r * 0.2); ctx.lineTo(r * 1.4, -r * 0.9); ctx.lineTo(r * 0.9, r * 0.1); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#f0e0a0";
-    ctx.beginPath(); ctx.moveTo(-r * 0.45, -r * 0.75); ctx.lineTo(-r * 0.65, -r * 1.25); ctx.lineTo(-r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r * 0.45, -r * 0.75); ctx.lineTo(r * 0.65, -r * 1.25); ctx.lineTo(r * 0.2, -r * 0.85); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.ellipse(0, r * 0.3, r * 0.5, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.3); ctx.lineTo(-r * 0.08, r * 0.5); ctx.lineTo(-r * 0.32, r * 0.5); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r * 0.2, r * 0.3); ctx.lineTo(r * 0.08, r * 0.5); ctx.lineTo(r * 0.32, r * 0.5); ctx.closePath(); ctx.fill();
-    drawEyes(ctx, r * 0.32, -r * 0.1, r * 0.2, isBlinking);
+  // Wing silhouette is the main species "family" cue: membrane (natural
+  // dragons), mechanical (rigid panel, World 2), or feather (owl-winged).
+  function drawDragonWings(ctx, r, cfg, wingFlap) {
+    ctx.save();
+    ctx.translate(r * 0.05, -r * 0.05);
+    ctx.rotate(-0.5 - wingFlap * 0.5);
+    ctx.fillStyle = cfg.wingColor;
+    if (cfg.wing === "feather") {
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(r * (0.9 - i * 0.15), -r * (0.5 + i * 0.22), r * (0.25 - i * 0.05), -r * 0.1);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else if (cfg.wing === "mechanical") {
+      roundRectPath(ctx, -r * 0.08, -r * 0.9, r * 0.28, r * 0.85, r * 0.08);
+      ctx.fill();
+      ctx.fillStyle = "#2a2a2a";
+      ctx.beginPath(); ctx.arc(r * 0.06, -r * 0.05, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = cfg.wingColor;
+      roundRectPath(ctx, r * 0.02, -r * 0.65, r * 0.2, r * 0.55, r * 0.06);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(r * 1.0, -r * 0.85, r * 0.2, -r * 0.1);
+      ctx.quadraticCurveTo(r * 0.55, -r * 0.4, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
-  function drawWizardBoss(ctx, size, color, accent, isBlinking) {
-    const r = size / 2;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.5, -r * 0.6);
-    ctx.lineTo(r * 0.5, -r * 0.6);
-    ctx.lineTo(r * 0.95, r * 0.9);
-    ctx.lineTo(-r * 0.95, r * 0.9);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 1.5);
-    ctx.lineTo(r * 0.55, -r * 0.55);
-    ctx.lineTo(-r * 0.55, -r * 0.55);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0, -r * 0.55, r * 0.6, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ffe066";
-    drawStar(ctx, 0, -r * 0.95, r * 0.12);
-    ctx.fillStyle = "#e8e8e8";
-    ctx.beginPath(); ctx.ellipse(0, -r * 0.15, r * 0.4, r * 0.32, 0, 0, Math.PI * 2); ctx.fill();
-    drawEyes(ctx, r * 0.2, -r * 0.15, r * 0.13, isBlinking);
+  // Horn style is the secondary species cue: natural curved horn, a
+  // mechanical antenna, a feather tuft, or a faceted crystal.
+  function drawDragonHorns(ctx, r, cfg) {
+    const hx = -r * 0.85, hy = -r * 0.15;
+    ctx.fillStyle = cfg.horn;
+    if (cfg.hornType === "antenna") {
+      ctx.strokeStyle = cfg.horn; ctx.lineWidth = r * 0.05;
+      ctx.beginPath(); ctx.moveTo(hx, hy - r * 0.3); ctx.lineTo(hx - r * 0.05, hy - r * 0.6); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx - r * 0.05, hy - r * 0.65, r * 0.08, 0, Math.PI * 2); ctx.fill();
+    } else if (cfg.hornType === "tuft") {
+      ctx.beginPath(); ctx.moveTo(hx + r * 0.1, hy - r * 0.25); ctx.lineTo(hx - r * 0.15, hy - r * 0.55); ctx.lineTo(hx + r * 0.2, hy - r * 0.35); ctx.closePath(); ctx.fill();
+    } else if (cfg.hornType === "crystal") {
+      ctx.beginPath(); ctx.moveTo(hx, hy - r * 0.25); ctx.lineTo(hx - r * 0.12, hy - r * 0.55); ctx.lineTo(hx + r * 0.08, hy - r * 0.4); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.moveTo(hx + r * 0.05, hy - r * 0.25); ctx.quadraticCurveTo(hx - r * 0.2, hy - r * 0.55, hx - r * 0.05, hy - r * 0.15); ctx.closePath(); ctx.fill();
+    }
   }
 
-  function drawOwlKingBoss(ctx, size, color, accent, isBlinking) {
-    drawOwl(ctx, size, color, accent, isBlinking);
-    const r = size / 2;
-    ctx.fillStyle = "#ffd35c";
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.5, -r * 0.95);
-    ctx.lineTo(-r * 0.3, -r * 1.25);
-    ctx.lineTo(-r * 0.1, -r * 0.95);
-    ctx.lineTo(0, -r * 1.3);
-    ctx.lineTo(r * 0.1, -r * 0.95);
-    ctx.lineTo(r * 0.3, -r * 1.25);
-    ctx.lineTo(r * 0.5, -r * 0.95);
-    ctx.closePath();
-    ctx.fill();
+  function drawDragonSpecialFeatures(ctx, r, cfg) {
+    if (cfg.fireGlow) {
+      ctx.fillStyle = "rgba(255,150,50,0.55)";
+      ctx.beginPath(); ctx.ellipse(-r * 1.05, r * 0.02, r * 0.18, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    if (cfg.runeGlow) {
+      ctx.fillStyle = "rgba(210,180,255,0.9)";
+      [[-r * 0.2, -r * 0.05], [r * 0.1, r * 0.15], [-r * 0.45, r * 0.1]].forEach(([px, py]) => {
+        ctx.beginPath(); ctx.arc(px, py, r * 0.05, 0, Math.PI * 2); ctx.fill();
+      });
+    }
   }
 
-  const MONSTER_SHAPE_DRAWERS = {
-    slime: drawSlime, goblin: drawGoblin, robot: drawRobot, owl: drawOwl, book: drawBook,
-    dragon: drawDragonBoss, wizard: drawWizardBoss, owlking: drawOwlKingBoss,
-  };
+  // Visual cue for HP: 2-HP dragons get metal armor plates on the back,
+  // 3-HP "elite" dragons get gold plates plus a small crest spike.
+  function drawHpModifiers(ctx, r, maxHp) {
+    if (maxHp >= 2) {
+      ctx.fillStyle = maxHp >= 3 ? "rgba(255,215,80,0.9)" : "rgba(130,140,150,0.9)";
+      [[-r * 0.25, -r * 0.32], [r * 0.05, -r * 0.36], [r * 0.32, -r * 0.24]].forEach(([px, py]) => {
+        roundRectPath(ctx, px - r * 0.11, py - r * 0.065, r * 0.22, r * 0.13, r * 0.04);
+        ctx.fill();
+      });
+    }
+    if (maxHp >= 3) {
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.95, -r * 0.5);
+      ctx.lineTo(-r * 0.78, -r * 0.82);
+      ctx.lineTo(-r * 0.62, -r * 0.55);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // Every monster in the game is a dragon walking left toward the castle:
+  // tail + back legs + wings drawn first (behind the body), then body, belly,
+  // front leg, neck/head, horns, special features, HP modifiers, and eye.
+  function drawDragon(ctx, size, cfg, isBlinking, wingFlap, legPhase, maxHp) {
+    const r = size / 2;
+    const legSwing = Math.sin(legPhase) * r * 0.18;
+    const tailWag = Math.sin(legPhase) * 3;
+
+    ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.32; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(r * 0.5, r * 0.1);
+    ctx.quadraticCurveTo(r * 1.1, r * 0.3 + tailWag, r * 1.3, -r * 0.05 + tailWag);
+    ctx.stroke();
+
+    ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.26;
+    ctx.beginPath(); ctx.moveTo(r * 0.22, r * 0.5); ctx.lineTo(r * 0.22 + legSwing, r * 0.92); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r * 0.28, r * 0.5); ctx.lineTo(-r * 0.28 - legSwing, r * 0.92); ctx.stroke();
+
+    drawDragonWings(ctx, r, cfg, wingFlap);
+
+    ctx.fillStyle = cfg.body;
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.72, r * 0.58, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = cfg.belly;
+    ctx.beginPath(); ctx.ellipse(-r * 0.05, r * 0.2, r * 0.48, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.26;
+    ctx.beginPath(); ctx.moveTo(-r * 0.5, r * 0.4); ctx.lineTo(-r * 0.5 - legSwing, r * 0.85); ctx.stroke();
+
+    ctx.fillStyle = cfg.body;
+    ctx.beginPath(); ctx.ellipse(-r * 0.82, -r * 0.15, r * 0.38, r * 0.33, -0.15, 0, Math.PI * 2); ctx.fill();
+
+    ctx.beginPath(); ctx.ellipse(-r * 1.12, -r * 0.05, r * 0.18, r * 0.14, -0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2a2a2a";
+    ctx.beginPath(); ctx.arc(-r * 1.24, -r * 0.05, r * 0.03, 0, Math.PI * 2); ctx.fill();
+
+    drawDragonHorns(ctx, r, cfg);
+    drawDragonSpecialFeatures(ctx, r, cfg);
+    drawHpModifiers(ctx, r, maxHp);
+    drawDragonEye(ctx, -r * 0.78, -r * 0.22, r * 0.12, isBlinking);
+  }
+
   const BASE_MONSTER_SIZE = 46; // px "diameter" at scale 1, before per-monster/boss scale
 
   function drawBossHpBar(ctx, m, size) {
@@ -1935,6 +2043,23 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     ctx.fillText(`${m.hp}/${m.maxHp}`, m.x, y - 2);
+  }
+
+  // Small HP pips above non-boss multi-HP dragons (armored/elite), separate
+  // from the full boss HP bar which shows a fraction + number instead.
+  function drawHpPips(ctx, m, size) {
+    const pipR = 4;
+    const spacing = 10;
+    const totalWidth = (m.maxHp - 1) * spacing;
+    const startX = m.x - totalWidth / 2;
+    const y = m.y - size * 0.7 - 10;
+    for (let i = 0; i < m.maxHp; i++) {
+      ctx.beginPath();
+      ctx.arc(startX + i * spacing, y, pipR, 0, Math.PI * 2);
+      ctx.fillStyle = i < m.hp ? "#e8590c" : "rgba(0,0,0,0.25)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1; ctx.stroke();
+    }
   }
 
   function drawMonster(ctx, m) {
@@ -1958,17 +2083,21 @@
     const size = BASE_MONSTER_SIZE * renderScale;
     const blinkCycle = (Date.now() / 1000 + m.blinkOffset / 300) % 3.2;
     const isBlinking = !m.dying && blinkCycle > 3.0;
+    const legPhase = Date.now() / 150 + m.bobOffset * 3;
+    const wingFlap = Math.sin(Date.now() / 220 + m.bobOffset * 1.3) * 0.5 + 0.5;
+    const cfg = DRAGON_SPECIES[m.speciesKey];
 
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(m.x, m.y + bob);
     ctx.scale(squashX, squashY);
-    const drawer = MONSTER_SHAPE_DRAWERS[m.shape] || drawSlime;
-    drawer(ctx, size, m.color, m.accent, isBlinking);
+    drawDragon(ctx, size, cfg, isBlinking, wingFlap, legPhase, m.maxHp);
     ctx.restore();
 
     if (m.isBoss && !m.dying) {
       drawBossHpBar(ctx, m, size);
+    } else if (!m.dying && m.maxHp > 1) {
+      drawHpPips(ctx, m, size);
     }
   }
 
@@ -1988,17 +2117,25 @@
     ctx2d.fillStyle = "#8fbf5f";
     ctx2d.fillRect(0, h * 0.75, w, h * 0.25);
 
-    // castle + cannon (cannon aims at the closest alive monster, if any)
+    // castle + cannon(s) — main cannon aims at the most urgent alive dragon
+    // (shortest time-to-castle); the second cannon (10-answer streak) aims at
+    // the next most urgent, matching whatever fireAtClosestMonster() targets.
     drawCastle(ctx2d, rect);
+    const barrelScale = state.cannonLevel >= 1 ? BALANCE.CANNON_TIER1_BARREL_SCALE : 1;
+    const aliveSorted = sortByThreat(state.monsters.filter(m => !m.dying));
     const muzzle = getCannonMuzzle(rect);
-    const aliveMonsters = state.monsters.filter(m => !m.dying);
     let aimAngle = 0;
-    if (aliveMonsters.length > 0) {
-      let closest = aliveMonsters[0];
-      for (const m of aliveMonsters) { if (m.x < closest.x) closest = m; }
-      aimAngle = Math.atan2(closest.y - muzzle.y, closest.x - muzzle.x);
+    if (aliveSorted[0]) {
+      aimAngle = Math.atan2(aliveSorted[0].y - muzzle.y, aliveSorted[0].x - muzzle.x);
     }
-    drawCannon(ctx2d, muzzle, aimAngle, state.cannonRecoil);
+    drawCannon(ctx2d, muzzle, aimAngle, state.cannonRecoil, barrelScale);
+    if (state.cannonLevel >= 2) {
+      const muzzle2 = getSecondCannonMuzzle(rect);
+      const target2 = aliveSorted[1] || aliveSorted[0];
+      let aimAngle2 = 0;
+      if (target2) aimAngle2 = Math.atan2(target2.y - muzzle2.y, target2.x - muzzle2.x);
+      drawCannon(ctx2d, muzzle2, aimAngle2, state.cannonRecoil, barrelScale);
+    }
 
     // monsters
     for (const m of state.monsters) {
@@ -2083,6 +2220,9 @@
     state.difficultyIndex = 0;
     state.correctStreak = 0;
     state.wrongStreak = 0;
+    state.cannonStreak = 0;
+    state.cannonLevel = 0;
+    state.pendingCannonDowngrade = false;
     state.currentAnswer = "";
     state.running = true;
     state.inputEnabled = true;
@@ -2092,6 +2232,7 @@
     confetti = [];
     document.getElementById("score").textContent = `${t("scoreLabel")}: 0`;
     updateHeartsDisplay();
+    updateStreakDisplay();
     document.getElementById("overlay").classList.remove("active");
     document.getElementById("worldSelectOverlay").classList.remove("active");
     document.getElementById("levelSelectOverlay").classList.remove("active");
