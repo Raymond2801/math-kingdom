@@ -4,15 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Math Kingdom</title>
+<!-- Friendly display font (Vietnamese-capable). Falls back to system fonts offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --font: 'Baloo 2', 'Trebuchet MS', 'Comic Sans MS', system-ui, sans-serif;
+    --gold: #ffcf4a;
+    --gold-deep: #c8902c;
+    --night: #1b1538;
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body {
     margin: 0; padding: 0; width: 100%;
     height: 100vh;   /* fallback for browsers without dvh support */
     height: 100dvh;  /* dynamic viewport height: accounts for Safari's collapsing toolbars */
     overflow: hidden;
-    background: linear-gradient(#87CEEB, #B0E0E6);
-    font-family: 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
+    background: var(--night);
+    font-family: var(--font);
     touch-action: manipulation;
   }
   #gameContainer {
@@ -27,21 +37,11 @@
        instead of pushing the layout past the visible viewport. */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
-  /* On short viewports (phones in landscape) shrink the bottom panel so the
-     full number pad + question always fit without scrolling; the canvas
-     above absorbs whatever space is left. */
-  @media (max-height: 480px) {
-    #bottomPanel { padding: 4px 10px 6px; gap: 3px; }
-    .numBtn { padding: 6px 0; }
-    #question { font-size: clamp(16px, 4.5vw, 26px); }
-    #question.wordProblemText { font-size: clamp(12px, 2.4vw, 16px); }
-    #feedback { font-size: clamp(13px, 3vw, 18px); min-height: 1.2em; }
-    #answerDisplay { font-size: clamp(16px, 4vw, 22px); min-height: 1em; }
-  }
   #canvasWrapper {
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
+    overflow: hidden;
   }
   #canvas {
     display: block;
@@ -49,132 +49,215 @@
     height: 100%;
     touch-action: none;
   }
+
+  /* ---------------------------------------------------------------- HUD */
   #hud {
     position: absolute;
     top: 0; left: 0; right: 0;
-    padding: 10px 16px;
+    padding: 8px 10px;
     pointer-events: none;
     z-index: 10;
   }
   #hudNormal, #quickUnlockBar {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     width: 100%;
   }
+  #hudLeft { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   #hearts, #score, #waveInfo, #quickUnlockProgress, #streakDisplay {
-    font-size: clamp(13px, 3vw, 22px);
-    font-weight: bold;
-    color: #3b2a1a;
-    text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff;
+    font-size: clamp(13px, 3vw, 20px);
+    font-weight: 800;
+    line-height: 1.15;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.35);
     white-space: nowrap;
+    background: rgba(20, 14, 48, 0.62);
+    border: 1.5px solid rgba(255,255,255,0.28);
+    border-radius: 999px;
+    padding: 4px 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.28);
   }
+  #hearts { letter-spacing: 1px; }
+  #streakDisplay { background: linear-gradient(rgba(255,140,40,0.85), rgba(220,70,20,0.85)); border-color: rgba(255,230,160,0.7); }
+  #waveInfo {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    border-radius: 18px;
+    min-width: 0; max-width: 52%;
+    padding: 4px 14px 5px;
+  }
+  #waveInfo .waveName { overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 0.92em; }
+  .waveDots { display: flex; gap: 4px; }
+  .waveDots .dot {
+    display: block; width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(255,255,255,0.22); border: 1.5px solid rgba(255,255,255,0.65);
+  }
+  .waveDots .dot.done { background: #7dff8a; border-color: #d6ffd9; }
+  .waveDots .dot.now { background: var(--gold); border-color: #fff3c4; box-shadow: 0 0 8px var(--gold); }
+  #quickUnlockProgress { border-radius: 18px; white-space: normal; }
   #quickUnlockCancelBtn {
     pointer-events: auto;
     padding: 6px 14px;
     font-size: 14px;
   }
+
+  /* ----------------------------------------------------- bottom panel */
   #bottomPanel {
     flex: 0 0 auto;
-    background: #fff8e7;
-    border-top: 4px solid #d4a94c;
+    background: linear-gradient(#fff4d6, #f1dca6);
+    border-top: 4px solid var(--gold-deep);
+    box-shadow: inset 0 3px 0 #ffeeb8, 0 -6px 18px rgba(0,0,0,0.3);
     padding: 8px 12px 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
     transition: opacity 0.2s;
+    position: relative;
+    z-index: 5;
   }
   #bottomPanel.disabled {
-    opacity: 0.45;
+    opacity: 0.5;
     pointer-events: none;
   }
+  /* Menus get the whole screen: the question panel only exists while playing. */
+  #gameContainer.menuMode #bottomPanel { display: none; }
   #question {
-    font-size: clamp(28px, 6vw, 44px);
-    font-weight: bold;
-    color: #4a3728;
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; max-width: 640px;
+    min-height: 1.15em;
+    padding: 2px 18px;
+    text-align: center;
+    font-size: clamp(30px, 6.2vw, 46px);
+    line-height: 1.1;
+    font-weight: 800;
+    color: #3a2750;
     letter-spacing: 2px;
+    text-shadow: 0 2px 0 rgba(255,255,255,0.65);
   }
   #question.wordProblemText {
-    font-size: clamp(14px, 2.8vw, 21px);
+    font-size: clamp(14px, 2.8vw, 20px);
     letter-spacing: normal;
-    line-height: 1.35;
-    max-width: 620px;
-    font-weight: bold;
+    line-height: 1.32;
+    font-weight: 700;
   }
+  /* Word-problem levels reserve three lines so the panel (and therefore the
+     3D scene above it) never changes height from one question to the next. */
+  #bottomPanel.wordMode #question.wordProblemText { min-height: calc(3 * 1.32em); }
   #feedback {
-    font-size: clamp(18px, 4vw, 26px);
-    font-weight: bold;
-    min-height: 1.4em;
+    font-size: clamp(16px, 3.6vw, 24px);
+    font-weight: 800;
+    min-height: 1.35em;
+    line-height: 1.35;
     transition: opacity 0.2s;
   }
   #answerDisplay {
-    font-size: clamp(22px, 5vw, 32px);
-    font-weight: bold;
+    font-size: clamp(24px, 5vw, 34px);
+    font-weight: 800;
+    line-height: 1.2;
     color: #2b6cb0;
-    min-height: 1.2em;
-    border-bottom: 3px solid #2b6cb0;
-    padding: 0 12px;
-    min-width: 60px;
+    min-height: 1.3em;
+    min-width: 130px;
+    padding: 0 16px;
     text-align: center;
+    background: #fffdf5;
+    border: 3px solid var(--gold-deep);
+    border-radius: 14px;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.14);
   }
   #numpad {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 6px;
+    gap: 7px;
     width: 100%;
-    max-width: 480px;
+    max-width: 500px;
   }
   .numBtn {
-    font-size: clamp(18px, 4vw, 26px);
-    font-weight: bold;
-    padding: 10px 0;
-    border-radius: 10px;
-    border: none;
-    background: linear-gradient(#ffd166, #f4a825);
-    color: #4a3728;
-    box-shadow: 0 3px 0 #b5791b;
+    font-family: var(--font);
+    font-size: clamp(20px, 4.4vw, 28px);
+    font-weight: 800;
+    padding: 6px 0 5px;
+    border-radius: 14px;
+    border: 2px solid rgba(60,30,0,0.28);
+    background: linear-gradient(#ffe27a, #f6b73c);
+    color: #4a2f12;
+    box-shadow: 0 4px 0 #b07a14, inset 0 2px 0 rgba(255,255,255,0.6);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
     cursor: pointer;
   }
+  .numBtn:hover { filter: brightness(1.06); }
   .numBtn:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 #b5791b;
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #b07a14, inset 0 2px 0 rgba(255,255,255,0.6);
   }
-  .numBtn.clear { background: linear-gradient(#ff8a80, #e5544a); box-shadow: 0 3px 0 #a13a32; }
-  .numBtn.enter { background: linear-gradient(#8bd17c, #57a349); box-shadow: 0 3px 0 #3d7332; }
+  .numBtn.clear { background: linear-gradient(#ff9a8f, #e5544a); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.25); box-shadow: 0 4px 0 #a13a32, inset 0 2px 0 rgba(255,255,255,0.45); }
+  .numBtn.enter { background: linear-gradient(#9be08a, #4fa843); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.25); box-shadow: 0 4px 0 #357a2c, inset 0 2px 0 rgba(255,255,255,0.45); }
+  .numBtn.clear:active { box-shadow: 0 1px 0 #a13a32, inset 0 2px 0 rgba(255,255,255,0.45); }
+  .numBtn.enter:active { box-shadow: 0 1px 0 #357a2c, inset 0 2px 0 rgba(255,255,255,0.45); }
 
-  /* Overlays are sized to canvasWrapper only, so they never cover the number pad */
+  /* On short viewports (phones in landscape) shrink the bottom panel so the
+     full number pad + question always fit without scrolling; the canvas
+     above absorbs whatever space is left. */
+  @media (max-height: 480px) {
+    #bottomPanel { padding: 4px 10px 6px; gap: 3px; border-top-width: 3px; }
+    .numBtn { padding: 3px 0 2px; box-shadow: 0 3px 0 #b07a14, inset 0 2px 0 rgba(255,255,255,0.6); }
+    #numpad { gap: 5px; }
+    #question { font-size: clamp(18px, 4.5vw, 28px); }
+    #question.wordProblemText { font-size: clamp(12px, 2.4vw, 16px); }
+    #feedback { font-size: clamp(13px, 3vw, 18px); min-height: 1.2em; }
+    #answerDisplay { font-size: clamp(16px, 4vw, 22px); min-height: 1.1em; border-width: 2px; }
+  }
+
+  /* ------------------------------------------------------------ overlays */
+  /* Overlays are sized to canvasWrapper only, so they never cover the number pad.
+     The live 3D scene shows through behind the menus. */
   #overlay, #worldSelectOverlay, #levelSelectOverlay {
     position: absolute;
     inset: 0;
     display: none;
     align-items: center;
-    justify-content: center;
     flex-direction: column;
     color: white;
     text-align: center;
     padding: 16px;
     overflow-y: auto;
   }
+  /* flexible spacers centre the content but let it scroll from the top when it overflows */
+  #overlay::before, #overlay::after,
+  #worldSelectOverlay::before, #worldSelectOverlay::after,
+  #levelSelectOverlay::before, #levelSelectOverlay::after { content: ""; flex: 1 0 0; }
   #overlay {
-    background: rgba(0,0,0,0.68);
+    background: radial-gradient(circle at 50% 40%, rgba(60,40,120,0.5), rgba(8,6,26,0.86));
     z-index: 20;
   }
   #overlay.active { display: flex; }
   #worldSelectOverlay, #levelSelectOverlay {
-    background: rgba(20,20,40,0.82);
+    background: linear-gradient(rgba(14,10,44,0.62), rgba(14,10,44,0.34) 42%, rgba(14,10,44,0.7));
     z-index: 30;
   }
   #worldSelectOverlay.active, #levelSelectOverlay.active { display: flex; }
+
+  #overlayCard {
+    background: linear-gradient(#41327f, #261a55);
+    border: 3px solid var(--gold);
+    border-radius: 24px;
+    padding: 20px 30px 24px;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.22);
+    max-width: min(92vw, 520px);
+  }
   #overlayTitle {
-    font-size: clamp(30px, 7vw, 56px);
-    font-weight: bold;
-    margin-bottom: 8px;
+    font-size: clamp(30px, 7vw, 54px);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 6px;
+    color: var(--gold);
+    text-shadow: 0 3px 0 #8a5a0a, 0 6px 14px rgba(0,0,0,0.5);
   }
   #overlaySubtitle {
     font-size: clamp(16px, 3.5vw, 22px);
-    margin-bottom: 20px;
+    font-weight: 700;
+    margin-bottom: 18px;
   }
   #overlayButtons {
     display: flex;
@@ -183,27 +266,44 @@
     align-items: center;
   }
   .overlayBtn {
+    font-family: var(--font);
     font-size: clamp(18px, 4.2vw, 26px);
-    font-weight: bold;
-    padding: 12px 32px;
-    border-radius: 14px;
-    border: none;
+    font-weight: 800;
+    padding: 8px 32px;
+    border-radius: 16px;
+    border: 2px solid rgba(0,0,0,0.25);
     color: white;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.3);
     cursor: pointer;
   }
   .overlayBtn.primary {
-    background: linear-gradient(#8bd17c, #57a349);
-    box-shadow: 0 5px 0 #3d7332;
+    background: linear-gradient(#9be08a, #4fa843);
+    box-shadow: 0 5px 0 #357a2c, inset 0 2px 0 rgba(255,255,255,0.4);
   }
-  .overlayBtn.primary:active { transform: translateY(3px); box-shadow: 0 2px 0 #3d7332; }
+  .overlayBtn.primary:active { transform: translateY(3px); box-shadow: 0 2px 0 #357a2c; }
   .overlayBtn.secondary {
-    background: linear-gradient(#74b9ff, #3f8efc);
-    box-shadow: 0 5px 0 #2a5da0;
+    background: linear-gradient(#7dbbff, #3f8efc);
+    box-shadow: 0 5px 0 #2a5da0, inset 0 2px 0 rgba(255,255,255,0.4);
   }
   .overlayBtn.secondary:active { transform: translateY(3px); box-shadow: 0 2px 0 #2a5da0; }
 
-  #worldSelectOverlay h1, #levelSelectOverlay h1 { font-size: clamp(26px, 6.5vw, 44px); margin: 0 0 6px; }
-  #worldSelectOverlay p, #levelSelectOverlay p { font-size: clamp(13px, 3vw, 17px); max-width: 560px; margin: 4px 0 12px; }
+  /* ------------------------------------------------------- menu screens */
+  #worldSelectOverlay h1, #levelSelectOverlay h1 {
+    font-size: clamp(30px, 8vw, 60px);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 6px;
+    color: var(--gold);
+    text-shadow: 0 3px 0 #a0640a, 0 6px 0 #6b3f06, 0 10px 18px rgba(0,0,0,0.5);
+  }
+  #levelSelectOverlay h1 { font-size: clamp(22px, 5.5vw, 38px); text-shadow: 0 3px 0 #6b3f06, 0 6px 14px rgba(0,0,0,0.5); }
+  #worldSelectOverlay p, #levelSelectOverlay p {
+    font-size: clamp(13px, 3vw, 18px);
+    font-weight: 700;
+    max-width: 560px;
+    margin: 4px 0 14px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  }
 
   #langToggle {
     position: absolute;
@@ -211,21 +311,23 @@
     right: 10px;
     display: flex;
     gap: 6px;
+    z-index: 2;
   }
   .langBtn {
+    font-family: var(--font);
     font-size: 14px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background: rgba(255,255,255,0.15);
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: rgba(20,14,48,0.55);
     color: white;
     cursor: pointer;
   }
   .langBtn.activeLang {
-    background: rgba(255,255,255,0.92);
+    background: rgba(255,255,255,0.95);
     color: #222;
     border-color: #fff;
-    font-weight: bold;
   }
 
   #levelSelectHeader {
@@ -235,13 +337,17 @@
     margin-bottom: 8px;
   }
   #backToWorldsBtn {
+    font-family: var(--font);
     font-size: clamp(13px, 3vw, 16px);
+    font-weight: 700;
     padding: 8px 14px;
-    border-radius: 10px;
-    border: none;
-    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: rgba(20,14,48,0.55);
     color: white;
     cursor: pointer;
+    white-space: nowrap;
+    flex: none;
   }
 
   #worldCards, #levelCards {
@@ -249,63 +355,115 @@
     gap: 14px;
     flex-wrap: wrap;
     justify-content: center;
-    max-width: 640px;
+    max-width: 700px;
   }
   .worldCard {
-    width: 175px;
-    padding: 16px 12px;
-    border-radius: 16px;
-    background: linear-gradient(#6dd5ed, #2193b0);
-    box-shadow: 0 4px 0 #1a6f85;
+    --c1: #6dd5ed; --c2: #2193b0; --edge: #1a6f85;
+    width: 178px;
+    padding: 14px 12px 12px;
+    border-radius: 20px;
+    background: linear-gradient(var(--c1), var(--c2));
+    border: 2px solid rgba(255,255,255,0.45);
+    box-shadow: 0 5px 0 var(--edge), 0 10px 20px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.45);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
+    position: relative;
+    overflow: hidden;
   }
+  .worldCard::after { /* soft gloss */
+    content: ""; position: absolute; left: -20%; right: -20%; top: -40%; height: 70%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.22), rgba(255,255,255,0) 70%);
+    pointer-events: none;
+  }
+  .worldCard[data-world="1"], .levelCard[data-world="1"] { --c1: #7be07f; --c2: #2f9a45; --edge: #1d6a2e; }
+  .worldCard[data-world="2"], .levelCard[data-world="2"] { --c1: #ffbd6b; --c2: #d9742a; --edge: #8f4a14; }
+  .worldCard[data-world="3"], .levelCard[data-world="3"] { --c1: #b79bff; --c2: #5b3bb8; --edge: #36228a; }
   .worldCard.locked {
-    background: linear-gradient(#8a8a8a, #5a5a5a);
-    box-shadow: 0 4px 0 #333;
-    opacity: 0.9;
+    --c1: #9a9aa6; --c2: #5d5d6a; --edge: #34343d;
+    opacity: 0.92;
   }
-  .worldCardEmoji { font-size: 34px; }
-  .worldCardTitle { font-weight: bold; font-size: 14px; margin-top: 4px; }
-  .worldCardAge { font-size: 12px; opacity: 0.9; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 8px; }
-  .worldCardSub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+  .worldCardEmoji {
+    font-size: 34px; line-height: 1;
+    width: 58px; height: 58px; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.25); border-radius: 50%;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .worldCardTitle { font-weight: 800; font-size: 15px; line-height: 1.15; margin-top: 4px; text-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+  .worldCardAge { font-size: 12px; font-weight: 700; background: rgba(0,0,0,0.25); padding: 1px 10px; border-radius: 999px; }
+  .worldCardSub { font-size: 11px; font-weight: 600; opacity: 0.92; margin: 2px 0 8px; }
+  .worldCardAge { margin-bottom: 8px; }
   .worldActionBtn {
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: bold;
-    padding: 8px 14px;
-    border-radius: 10px;
-    border: none;
+    font-family: var(--font);
+    margin-top: auto;
+    font-size: 15px;
+    font-weight: 800;
+    white-space: nowrap;
+    padding: 6px 6px;
+    border-radius: 12px;
+    border: 2px solid rgba(0,0,0,0.22);
     color: white;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.3);
     cursor: pointer;
     width: 100%;
+    position: relative; z-index: 1;
   }
-  .worldActionBtn.primary { background: linear-gradient(#8bd17c, #57a349); box-shadow: 0 3px 0 #3d7332; }
-  .worldActionBtn.secondary { background: linear-gradient(#f4a825, #d4820f); box-shadow: 0 3px 0 #8a5606; }
+  .worldCardAge + .worldActionBtn, .worldCardSub + .worldActionBtn { margin-top: auto; }
+  .worldActionBtn.primary { background: linear-gradient(#ffe27a, #f6a82c); color: #4a2f12; text-shadow: 0 1px 0 rgba(255,255,255,0.5); box-shadow: 0 3px 0 #a86c10; }
+  .worldActionBtn.secondary { background: linear-gradient(#7dbbff, #3f8efc); box-shadow: 0 3px 0 #2a5da0; }
   .worldActionBtn:active { transform: translateY(2px); }
 
   .levelCard {
-    width: 150px;
-    padding: 16px 10px;
-    border-radius: 16px;
-    border: none;
-    background: linear-gradient(#6dd5ed, #2193b0);
+    --c1: #6dd5ed; --c2: #2193b0; --edge: #1a6f85;
+    font-family: var(--font);
+    width: 156px;
+    padding: 14px 10px;
+    border-radius: 20px;
+    border: 2px solid rgba(255,255,255,0.45);
+    background: linear-gradient(var(--c1), var(--c2));
     color: white;
     cursor: pointer;
-    box-shadow: 0 4px 0 #1a6f85;
+    box-shadow: 0 5px 0 var(--edge), 0 10px 20px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.45);
   }
-  .levelCard:active { transform: translateY(3px); box-shadow: 0 1px 0 #1a6f85; }
+  .levelCard:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--edge); }
   .levelCard.locked {
-    background: linear-gradient(#8a8a8a, #5a5a5a);
+    --c1: #9a9aa6; --c2: #5d5d6a; --edge: #34343d;
     cursor: not-allowed;
-    box-shadow: 0 4px 0 #333;
-    opacity: 0.75;
+    opacity: 0.85;
   }
-  .levelCardEmoji { font-size: 36px; }
-  .levelCardTitle { font-weight: bold; font-size: 15px; margin-top: 6px; }
-  .levelCardSub { font-size: 12px; margin-top: 4px; opacity: 0.9; }
+  .levelCardEmoji {
+    font-size: 36px; line-height: 1; margin: 0 auto;
+    width: 62px; height: 62px; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.25); border-radius: 50%;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .levelCardTitle { font-weight: 800; font-size: 16px; line-height: 1.15; margin-top: 8px; text-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+  .levelCardSub { font-size: 12px; font-weight: 700; margin-top: 4px; opacity: 0.95; }
+
+  /* narrow screens (placed last so it overrides the base card rules) */
+  @media (max-width: 560px) {
+    #langToggle { position: static; align-self: flex-end; margin-bottom: 6px; }
+    #worldCards { flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+    .worldCard {
+      width: min(100%, 340px);
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      grid-template-areas: "emoji title" "emoji age" "sub sub" "btn btn";
+      column-gap: 12px; row-gap: 2px;
+      align-items: center; justify-items: start;
+      text-align: left;
+      padding: 10px 12px 12px;
+    }
+    .worldCardEmoji { grid-area: emoji; width: 56px; height: 56px; }
+    .worldCardTitle { grid-area: title; margin: 0; font-size: 14px; }
+    .worldCardAge { grid-area: age; margin: 0; }
+    .worldCardSub { grid-area: sub; margin: 6px 0 0; }
+    .worldActionBtn { grid-area: btn; margin-top: 8px; }
+    .worldCardAge + .worldActionBtn, .worldCardSub + .worldActionBtn { margin-top: 8px; }
+    #levelCards { gap: 10px; }
+    .levelCard { width: 148px; }
+  }
 </style>
 </head>
 <body>
@@ -314,8 +472,10 @@
     <canvas id="canvas"></canvas>
     <div id="hud">
       <div id="hudNormal">
-        <div id="hearts">❤️❤️❤️</div>
-        <div id="streakDisplay" style="visibility:hidden;">🔥 x0</div>
+        <div id="hudLeft">
+          <div id="hearts">❤️❤️❤️</div>
+          <div id="streakDisplay" style="visibility:hidden;">🔥 x0</div>
+        </div>
         <div id="waveInfo">Select a World</div>
         <div id="score">Score: 0</div>
       </div>
@@ -325,11 +485,13 @@
       </div>
     </div>
     <div id="overlay">
-      <div id="overlayTitle">Game Over</div>
-      <div id="overlaySubtitle">Score: 0</div>
-      <div id="overlayButtons">
-        <button id="primaryBtn" class="overlayBtn primary">Retry Level</button>
-        <button id="levelSelectBtn" class="overlayBtn secondary">Choose Level</button>
+      <div id="overlayCard">
+        <div id="overlayTitle">Game Over</div>
+        <div id="overlaySubtitle">Score: 0</div>
+        <div id="overlayButtons">
+          <button id="primaryBtn" class="overlayBtn primary">Retry Level</button>
+          <button id="levelSelectBtn" class="overlayBtn secondary">Choose Level</button>
+        </div>
       </div>
     </div>
     <div id="worldSelectOverlay" class="active">
@@ -387,16 +549,15 @@
     BASE_SPAWN_INTERVAL_MS: 2600, // ms between spawns at wave 1
     SPAWN_INTERVAL_DECREMENT_MS: 250, // spawn gets faster (smaller interval) each wave
     MIN_SPAWN_INTERVAL_MS: 900,   // floor for spawn interval
-    CANNONBALL_SPEED: 9,          // px/frame for the cannonball projectile
-    CANNONBALL_ARC_HEIGHT: 40,    // px the cannonball rises above the direct line at the midpoint of its flight
+    CANNONBALL_SPEED: 9,          // screen px/frame for the cannonball projectile
     SCORE_PER_CORRECT: 10,        // points per monster kill (or per boss hit)
     STREAK_UP_THRESHOLD: 5,       // consecutive correct answers to raise difficulty tier
     STREAK_DOWN_THRESHOLD: 2,     // consecutive wrong answers to lower difficulty tier
     WRONG_ANSWER_DISPLAY_MS: 1500,// how long the correct answer is shown after a wrong guess
-    SPAWN_X_FRACTION: 0.98,       // default spawn position as fraction of canvas width from left
+    TRAVEL_DISTANCE_PX: 680,      // length of a dragon's charge, in "px": the speeds above are px/frame along this distance
     BOSS_HP: 3,                   // correct answers needed to defeat the boss
     BOSS_KILL_BONUS: 30,          // extra score on top of per-hit score when boss dies
-    BOSS_SCALE: 1.7,              // boss render size multiplier vs a regular monster
+    BOSS_SCALE: 1.45,             // boss render size multiplier vs a regular monster
     BOSS_SPEED_MULTIPLIER: 0.9,   // boss moves a bit slower than regular monsters despite being tougher
     QUICK_UNLOCK_STREAK_REQUIRED: 3, // consecutive correct sample answers to skip-unlock a world
     HP_SPEED_PENALTY_PER_EXTRA_HP: 0.35, // multi-HP dragons move this fraction slower per HP above 1
@@ -412,7 +573,7 @@
   const I18N = {
     vi: {
       gameTitle: "🏰 Math Kingdom 👾",
-      tagline: "Chọn thế giới của bạn! Quái vật đang tiến về lâu đài — giải toán để bắn hạ chúng.",
+      tagline: "Chọn thế giới của bạn! Bạn đứng trên tường thành — rồng dữ đang lao thẳng về phía bạn. Giải toán để bắn hạ chúng!",
       selectWorldPlaceholder: "Chọn Thế Giới",
       worldLabel: "Thế giới",
       levelLabel: "Cấp",
@@ -459,7 +620,7 @@
     },
     en: {
       gameTitle: "🏰 Math Kingdom 👾",
-      tagline: "Choose your world! Monsters are marching on the castle — solve the math to shoot them down.",
+      tagline: "Choose your world! You stand on the castle wall — fierce dragons are charging straight at you. Solve the math to blast them down!",
       selectWorldPlaceholder: "Select a World",
       worldLabel: "World",
       levelLabel: "Level",
@@ -557,9 +718,9 @@
       id: 3,
       emoji: "📖",
       levels: [
-        { id: 1, emoji: "📗", kind: "wordproblem", opSet: ["+", "-"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
-        { id: 2, emoji: "📘", kind: "wordproblem", opSet: ["+", "-", "*"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: false },
-        { id: 3, emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, spawnXFraction: 1.15, hasBoss: true },
+        { id: 1, emoji: "📗", kind: "wordproblem", opSet: ["+", "-"], monsterSpeedMultiplier: 0.7, travelDistanceMultiplier: 1.2, hasBoss: false },
+        { id: 2, emoji: "📘", kind: "wordproblem", opSet: ["+", "-", "*"], monsterSpeedMultiplier: 0.7, travelDistanceMultiplier: 1.2, hasBoss: false },
+        { id: 3, emoji: "📕", kind: "wordproblem", opSet: ["+", "-", "*", "/"], monsterSpeedMultiplier: 0.7, travelDistanceMultiplier: 1.2, hasBoss: true },
       ],
     },
   ];
@@ -569,27 +730,28 @@
   }
 
   // =========================================================================
-  // DRAGON VISUAL DESIGNS — Canvas-drawn, no image assets. Every monster in
-  // every world is a dragon; species differ by silhouette (wing style +
-  // horn style) and color palette so kids can tell them apart at a glance.
-  // Regular monsters cycle by wave; each world's boss (level 3, final wave)
-  // uses a bigger, more intense variant of that world's element.
+  // DRAGON ART — every monster is a fierce dragon seen head-on, charging at
+  // the player. Drawn with canvas primitives (no image files), centred on
+  // (0,0) with its full height == `size`. Coordinates below are in units of
+  // r = size/2: x in [-1.7, 1.7] (wing span), y in [-1, 1] (horn tips to
+  // talons). Species differ by palette, horn style, wing style and a few
+  // glowing extras; HP tiers add armor; bosses add a crown and aura.
   // =========================================================================
   const DRAGON_SPECIES = {
-    // World 1 "Cộng Trừ": small cute dragons
-    grass:     { body: "#6ec766", belly: "#bfe89a", horn: "#3f7a3a", hornType: "leaf",    wing: "membrane",   wingColor: "#4a9e42" },
-    water:     { body: "#4a90d9", belly: "#bfe3ff", horn: "#2a5a94", hornType: "leaf",    wing: "membrane",   wingColor: "#3a78c0" },
-    fireBaby:  { body: "#e35b4f", belly: "#ffcf9e", horn: "#a83226", hornType: "leaf",    wing: "membrane",   wingColor: "#c94a3a", fireGlow: true },
-    // World 2 "Phép Nhân": mechanical / armored dragons
-    gear:      { body: "#9aa5ad", belly: "#d8dee3", horn: "#5a6570", hornType: "antenna", wing: "mechanical", wingColor: "#6b7580" },
-    steel:     { body: "#7d8a97", belly: "#c3ccd4", horn: "#3f4a54", hornType: "antenna", wing: "mechanical", wingColor: "#4a5560" },
+    // World 1 "Cộng Trừ": forest / water / fire drakes
+    grass:     { body: "#3f9a45", belly: "#dfe58f", horn: "#efe6c4", hornType: "curved",  wing: "membrane",   wingColor: "#2b7a38", eye: "#ffe94a", mouth: "#ffb02e", spike: "#1c4a24" },
+    water:     { body: "#2f78c4", belly: "#bfe9f5", horn: "#e6f1f7", hornType: "curved",  wing: "membrane",   wingColor: "#1f5a9e", eye: "#7ff3ff", mouth: "#59d8ff", spike: "#12365e" },
+    fireBaby:  { body: "#d9482f", belly: "#ffd08a", horn: "#2a1a1a", hornType: "curved",  wing: "membrane",   wingColor: "#a82a1c", eye: "#ffc83a", mouth: "#ff7a1a", spike: "#5a140d", fireGlow: true },
+    // World 2 "Phép Nhân": clockwork war dragons
+    gear:      { body: "#7c8993", belly: "#c6a15a", horn: "#caa04a", hornType: "antenna", wing: "mechanical", wingColor: "#5b6872", eye: "#ff5a3a", mouth: "#ff8a2a", spike: "#3a434b", gear: true },
+    steel:     { body: "#454e58", belly: "#8c97a2", horn: "#2a3037", hornType: "antenna", wing: "mechanical", wingColor: "#2f363e", eye: "#ff3b3b", mouth: "#ff4a2a", spike: "#1b2026", visor: true },
     // World 3 "Toán Đố": mystic dragons
-    owlWinged: { body: "#8a6a4a", belly: "#d9bd8f", horn: "#5a4028", hornType: "tuft",    wing: "feather",    wingColor: "#6b4e30" },
-    rune:      { body: "#7a4ae0", belly: "#c9b3ff", horn: "#4a2896", hornType: "crystal", wing: "membrane",   wingColor: "#5c34b0", runeGlow: true },
-    // Bosses: bigger, more intense variant per world (same element family)
-    fireBoss:  { body: "#c9382a", belly: "#ffb066", horn: "#7a1f16", hornType: "leaf",    wing: "membrane",   wingColor: "#a8291d", fireGlow: true },
-    steelBoss: { body: "#5c6a78", belly: "#a8b4bd", horn: "#2a333c", hornType: "antenna", wing: "mechanical", wingColor: "#333d46" },
-    runeBoss:  { body: "#9a5cf0", belly: "#e0ccff", horn: "#5c2fa0", hornType: "crystal", wing: "membrane",   wingColor: "#7c3fd0", runeGlow: true },
+    owlWinged: { body: "#7a5535", belly: "#e0c28f", horn: "#3a2616", hornType: "tuft",    wing: "feather",    wingColor: "#5a3d24", eye: "#ffe03a", mouth: "#ffb43a", spike: "#3a2616" },
+    rune:      { body: "#6b36c9", belly: "#cfb8ff", horn: "#d9c6ff", hornType: "crystal", wing: "membrane",   wingColor: "#4a22a0", eye: "#ff5cf0", mouth: "#d24dff", spike: "#2c1266", runeGlow: true },
+    // Bosses: darker, bigger, crowned
+    fireBoss:  { body: "#a3231a", belly: "#ff9a3c", horn: "#1c1414", hornType: "curved",  wing: "membrane",   wingColor: "#6e130f", eye: "#ffd23a", mouth: "#ff7a1a", spike: "#2a0a08", fireGlow: true, crown: "#ffcc33" },
+    steelBoss: { body: "#2b323a", belly: "#6b7782", horn: "#15191e", hornType: "antenna", wing: "mechanical", wingColor: "#1c2128", eye: "#ff2a2a", mouth: "#ff3a1a", spike: "#0e1114", visor: true, crown: "#c9ced4" },
+    runeBoss:  { body: "#4a1f99", belly: "#b48cff", horn: "#e8d8ff", hornType: "crystal", wing: "membrane",   wingColor: "#33157a", eye: "#ff4af0", mouth: "#e24dff", spike: "#1c0a4a", runeGlow: true, crown: "#ff7bf5" },
   };
   const DRAGON_SPECIES_BY_WORLD = {
     1: ["grass", "water", "fireBaby"],
@@ -597,6 +759,427 @@
     3: ["owlWinged", "rune"],
   };
   const BOSS_DRAGON_SPECIES_BY_WORLD = { 1: "fireBoss", 2: "steelBoss", 3: "runeBoss" };
+
+  // --- tiny colour helpers (cached: dragons are drawn every frame) ---------
+  const colorCache = new Map();
+  function hexParts(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [n >> 16, (n >> 8) & 255, n & 255];
+  }
+  // amt in [-1,1]: negative mixes toward black, positive toward white
+  function shade(hex, amt) {
+    const key = hex + "|" + amt;
+    let v = colorCache.get(key);
+    if (!v) {
+      const [r, g, b] = hexParts(hex);
+      const target = amt < 0 ? 0 : 255, k = Math.abs(amt);
+      v = `rgb(${Math.round(r + (target - r) * k)},${Math.round(g + (target - g) * k)},${Math.round(b + (target - b) * k)})`;
+      colorCache.set(key, v);
+    }
+    return v;
+  }
+  function rgba(hex, a) {
+    const [r, g, b] = hexParts(hex);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function polyPath(ctx, r, pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * r, pts[0][1] * r);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * r, pts[i][1] * r);
+    ctx.closePath();
+  }
+  function fillStroke(ctx, fill) {
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // One wing, drawn for the RIGHT side in a frame whose origin is the
+  // shoulder; the caller mirrors it for the left wing. flap > 0 lifts the tip.
+  function drawDragonWing(ctx, r, cfg, flap, outline) {
+    ctx.save();
+    ctx.translate(0.40 * r, -0.02 * r);
+    ctx.rotate(-flap);
+    const W = [0.62, -0.80], F1 = [1.28, -1.00], F2 = [1.26, -0.28], F3 = [0.86, 0.36], B = [0.10, 0.50];
+    const bone = shade(cfg.wingColor, -0.5);
+    if (cfg.wing === "mechanical") {
+      // rigid blade wing: layered steel blades with glowing seams
+      const blades = [[1.34, -1.04], [1.40, -0.62], [1.32, -0.16], [1.04, 0.30]];
+      blades.forEach(([tx, ty], i) => {
+        const len = Math.hypot(tx, ty), ux = tx / len, uy = ty / len;
+        const nx = -uy, ny = ux;
+        polyPath(ctx, r, [[nx * 0.17, ny * 0.17], [tx * 0.62 + nx * 0.21, ty * 0.62 + ny * 0.21], [tx, ty],
+          [tx * 0.62 - nx * 0.21, ty * 0.62 - ny * 0.21], [-nx * 0.17, -ny * 0.17]]);
+        fillStroke(ctx, i % 2 ? shade(cfg.wingColor, 0.12) : cfg.wingColor);
+        ctx.strokeStyle = rgba(cfg.eye, 0.6);
+        ctx.lineWidth = r * 0.03;
+        ctx.beginPath(); ctx.moveTo(tx * 0.25 * r, ty * 0.25 * r); ctx.lineTo(tx * 0.9 * r, ty * 0.9 * r); ctx.stroke();
+        ctx.strokeStyle = outline; ctx.lineWidth = Math.max(1, r * 0.036);
+      });
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.15, 0, Math.PI * 2);
+      fillStroke(ctx, shade(cfg.wingColor, 0.25));
+      ctx.fillStyle = cfg.eye; ctx.beginPath(); ctx.arc(0, 0, r * 0.06, 0, Math.PI * 2); ctx.fill();
+    } else if (cfg.wing === "feather") {
+      for (let i = 0; i < 6; i++) {
+        const ang = -0.92 + i * 0.30, len = 1.48 - Math.abs(i - 1.5) * 0.05;
+        const tx = Math.cos(ang) * len, ty = Math.sin(ang) * len;
+        const px = -Math.sin(ang) * 0.30, py = Math.cos(ang) * 0.30;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo((tx * 0.55 + px) * r, (ty * 0.55 + py) * r, tx * r, ty * r);
+        ctx.quadraticCurveTo((tx * 0.55 - px) * r, (ty * 0.55 - py) * r, 0, 0);
+        fillStroke(ctx, i % 2 ? shade(cfg.wingColor, 0.16) : cfg.wingColor);
+      }
+    } else {
+      // bat-like membrane with scalloped trailing edge, bones and a wrist claw
+      const scallop = (a, b) => {
+        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        return [(mx + (W[0] - mx) * 0.38) * r, (my + (W[1] - my) * 0.38) * r];
+      };
+      const g = ctx.createLinearGradient(0, 0, F2[0] * r, F2[1] * r);
+      g.addColorStop(0, shade(cfg.wingColor, 0.12));
+      g.addColorStop(1, shade(cfg.wingColor, -0.22));
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(W[0] * r, W[1] * r);
+      ctx.lineTo(F1[0] * r, F1[1] * r);
+      let c = scallop(F1, F2); ctx.quadraticCurveTo(c[0], c[1], F2[0] * r, F2[1] * r);
+      c = scallop(F2, F3); ctx.quadraticCurveTo(c[0], c[1], F3[0] * r, F3[1] * r);
+      c = scallop(F3, B); ctx.quadraticCurveTo(c[0], c[1], B[0] * r, B[1] * r);
+      ctx.closePath();
+      fillStroke(ctx, g);
+      ctx.strokeStyle = bone; ctx.lineWidth = r * 0.07;
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(W[0] * r, W[1] * r); ctx.lineTo(F1[0] * r, F1[1] * r);
+      ctx.moveTo(W[0] * r, W[1] * r); ctx.lineTo(F2[0] * r, F2[1] * r);
+      ctx.moveTo(W[0] * r, W[1] * r); ctx.lineTo(F3[0] * r, F3[1] * r);
+      ctx.stroke();
+      if (cfg.runeGlow) {
+        ctx.strokeStyle = rgba(cfg.eye, 0.8); ctx.lineWidth = r * 0.03;
+        ctx.beginPath();
+        ctx.moveTo(0.1 * r, 0); ctx.lineTo((W[0] * 0.9) * r, (W[1] * 0.85) * r);
+        ctx.moveTo(W[0] * 0.85 * r, W[1] * 0.85 * r); ctx.lineTo(F2[0] * 0.9 * r, F2[1] * 0.9 * r);
+        ctx.moveTo(W[0] * 0.8 * r, W[1] * 0.8 * r); ctx.lineTo(F3[0] * 0.85 * r, F3[1] * 0.85 * r);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = outline; ctx.lineWidth = Math.max(1, r * 0.036);
+      polyPath(ctx, r, [[W[0] - 0.05, W[1] + 0.02], [W[0] - 0.01, W[1] - 0.20], [W[0] + 0.07, W[1] + 0.02]]);
+      fillStroke(ctx, "#efe6c4");
+    }
+    ctx.restore();
+  }
+
+  function drawDragonHorn(ctx, r, cfg, outline) {
+    // RIGHT horn only; caller mirrors
+    if (cfg.hornType === "antenna") {
+      polyPath(ctx, r, [[0.30, -0.66], [0.44, -1.0], [0.38, -0.62]]);
+      fillStroke(ctx, cfg.horn);
+      ctx.strokeStyle = shade(cfg.horn, -0.3); ctx.lineWidth = r * 0.06;
+      ctx.beginPath(); ctx.moveTo(0.18 * r, -0.74 * r); ctx.lineTo(0.62 * r, -0.92 * r); ctx.stroke();
+      ctx.strokeStyle = outline; ctx.lineWidth = Math.max(1, r * 0.036);
+      ctx.beginPath(); ctx.arc(0.64 * r, -0.93 * r, r * 0.07, 0, Math.PI * 2);
+      fillStroke(ctx, cfg.eye);
+    } else if (cfg.hornType === "tuft") {
+      [[0.84, -0.99, 0.26, -0.70], [0.98, -0.82, 0.34, -0.66], [0.66, -1.04, 0.20, -0.74]].forEach(([tx, ty, bx, by]) => {
+        polyPath(ctx, r, [[bx, by], [tx, ty], [bx + 0.16, by + 0.05]]);
+        fillStroke(ctx, cfg.horn);
+      });
+    } else if (cfg.hornType === "crystal") {
+      [[0.80, -1.02, 0.26, -0.70], [0.96, -0.80, 0.40, -0.64], [0.56, -1.0, 0.18, -0.72]].forEach(([tx, ty, bx, by], i) => {
+        polyPath(ctx, r, [[bx, by], [tx, ty], [bx + 0.15, by + 0.06]]);
+        fillStroke(ctx, i === 1 ? shade(cfg.horn, -0.18) : cfg.horn);
+      });
+    } else {
+      // sweeping curved horn
+      ctx.beginPath();
+      ctx.moveTo(0.24 * r, -0.62 * r);
+      ctx.quadraticCurveTo(0.80 * r, -0.70 * r, 0.88 * r, -1.02 * r);
+      ctx.quadraticCurveTo(0.58 * r, -0.86 * r, 0.40 * r, -0.76 * r);
+      ctx.closePath();
+      fillStroke(ctx, cfg.horn);
+    }
+  }
+
+  // Cog used by the mechanical dragons (forehead gear)
+  function drawCog(ctx, x, y, rad, teeth, rot, fill, outline) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(rot);
+    ctx.beginPath();
+    for (let i = 0; i < teeth * 2; i++) {
+      const a = (i / (teeth * 2)) * Math.PI * 2, rr = i % 2 ? rad * 0.78 : rad;
+      ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = outline;
+    ctx.beginPath(); ctx.arc(0, 0, rad * 0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // anim: { time (ms), seed, mouth (0..1 jaw opening), maxHp, isBoss }
+  function drawDragon(ctx, size, cfg, anim) {
+    const r = size / 2;
+    const t = anim.time / 1000 + anim.seed;
+    const flap = 0.2 + Math.sin(t * 5.4) * 0.42;
+    const mouth = Math.max(0.12, Math.min(1, anim.mouth));
+    const maxHp = anim.maxHp || 1;
+    const detail = r > 16;
+    const tiny = r < 14;   // far-away dragons: skip fine detail (they are a few px tall)
+    const outline = shade(cfg.body, -0.85);
+    const lw = Math.max(1, r * 0.036);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 4);
+
+    ctx.save();
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.lineWidth = lw; ctx.strokeStyle = outline;
+
+    // ---- aura: armored dragons shimmer, bosses smoulder -------------------
+    if (anim.isBoss || maxHp >= 2) {
+      const hex = anim.isBoss ? cfg.eye : (maxHp >= 3 ? "#ffd24d" : "#bcd0e6");
+      const a = (anim.isBoss ? 0.42 : 0.30) * (0.8 + 0.2 * pulse);
+      const g = ctx.createRadialGradient(0, 0.05 * r, r * 0.25, 0, 0.05 * r, r * 1.6);
+      g.addColorStop(0, rgba(hex, a));
+      g.addColorStop(1, rgba(hex, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0.05 * r, r * 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // ---- tail (peeks out below, ends in a spade) --------------------------
+    if (!tiny) {
+      const tw = Math.sin(t * 2.2) * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(0.10 * r, 0.74 * r);
+      ctx.quadraticCurveTo(0.62 * r, (1.10 + tw) * r, 0.94 * r, (0.72 + tw) * r);
+      ctx.strokeStyle = outline; ctx.lineWidth = r * 0.28; ctx.stroke();
+      ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.18; ctx.stroke();
+      ctx.strokeStyle = outline; ctx.lineWidth = lw;
+      polyPath(ctx, r, [[0.86, 0.74 + tw], [1.08, 0.50 + tw], [1.04, 0.84 + tw]]);
+      fillStroke(ctx, cfg.spike);
+
+    }
+
+    // ---- wings (behind the body) ------------------------------------------
+    drawDragonWing(ctx, r, cfg, flap, outline);
+    ctx.save(); ctx.scale(-1, 1); drawDragonWing(ctx, r, cfg, flap, outline); ctx.restore();
+
+    // ---- rear feet with talons --------------------------------------------
+    if (!tiny) {
+      [-1, 1].forEach((s) => {
+        ctx.save(); ctx.scale(s, 1);
+        ctx.beginPath(); ctx.ellipse(0.32 * r, 0.86 * r, r * 0.17, r * 0.08, 0, 0, Math.PI * 2);
+        fillStroke(ctx, cfg.body);
+        ctx.restore();
+      });
+
+    }
+
+    // ---- torso, belly plates ----------------------------------------------
+    ctx.beginPath();
+    ctx.moveTo(-0.30 * r, -0.08 * r);
+    ctx.bezierCurveTo(-0.76 * r, 0.00, -0.68 * r, 0.46 * r, -0.32 * r, 0.82 * r);
+    ctx.lineTo(0.32 * r, 0.82 * r);
+    ctx.bezierCurveTo(0.68 * r, 0.46 * r, 0.76 * r, 0.00, 0.30 * r, -0.08 * r);
+    ctx.closePath();
+    fillStroke(ctx, cfg.body);
+    ctx.beginPath(); ctx.ellipse(0, 0.40 * r, r * 0.23, r * 0.42, 0, 0, Math.PI * 2);
+    fillStroke(ctx, cfg.belly);
+    if (detail) {
+      // cel shading: dark band on the lower flanks, light rim on the shoulders
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-0.30 * r, -0.08 * r);
+      ctx.bezierCurveTo(-0.76 * r, 0.00, -0.68 * r, 0.46 * r, -0.32 * r, 0.82 * r);
+      ctx.lineTo(0.32 * r, 0.82 * r);
+      ctx.bezierCurveTo(0.68 * r, 0.46 * r, 0.76 * r, 0.00, 0.30 * r, -0.08 * r);
+      ctx.closePath(); ctx.clip();
+      ctx.fillStyle = "rgba(0,0,0,0.20)";
+      ctx.beginPath(); ctx.ellipse(0.1 * r, 1.0 * r, r * 0.9, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.13)";
+      ctx.beginPath(); ctx.ellipse(-0.42 * r, 0.05 * r, r * 0.16, r * 0.34, 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (detail) {
+      ctx.strokeStyle = shade(cfg.belly, -0.4); ctx.lineWidth = r * 0.03;
+      for (let i = 0; i < 4; i++) {
+        const y = 0.12 + i * 0.12, hw = 0.20 - Math.abs(i - 1.2) * 0.015;
+        ctx.beginPath(); ctx.moveTo(-hw * r, y * r); ctx.quadraticCurveTo(0, (y + 0.06) * r, hw * r, y * r); ctx.stroke();
+      }
+      ctx.strokeStyle = outline; ctx.lineWidth = lw;
+    }
+    if (cfg.runeGlow && detail) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(cfg.eye, 0.5 + 0.4 * pulse);
+      [[0, 0.30], [-0.14, 0.50], [0.14, 0.50]].forEach(([x, y]) => {
+        polyPath(ctx, r, [[x, y - 0.07], [x + 0.045, y], [x, y + 0.07], [x - 0.045, y]]); ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    // ---- arms with claws, shoulder spikes ---------------------------------
+    if (!tiny) {
+      [-1, 1].forEach((s) => {
+        ctx.save(); ctx.scale(s, 1);
+        ctx.beginPath();
+        ctx.moveTo(0.48 * r, 0.04 * r); ctx.lineTo(0.68 * r, 0.30 * r); ctx.lineTo(0.54 * r, 0.54 * r);
+        ctx.strokeStyle = outline; ctx.lineWidth = r * 0.24; ctx.stroke();
+        ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.16; ctx.stroke();
+        ctx.strokeStyle = outline; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.arc(0.54 * r, 0.56 * r, r * 0.11, 0, Math.PI * 2); fillStroke(ctx, cfg.body);
+        if (detail) {
+          [0.43, 0.54, 0.65].forEach((x) => {
+            ctx.beginPath();
+            ctx.moveTo((x - 0.045) * r, 0.62 * r);
+            ctx.quadraticCurveTo((x - 0.03) * r, 0.88 * r, (x - 0.10) * r, 0.96 * r);
+            ctx.quadraticCurveTo((x + 0.05) * r, 0.84 * r, (x + 0.045) * r, 0.62 * r);
+            ctx.closePath();
+            fillStroke(ctx, "#f2ead0");
+          });
+        }
+        // shoulder pauldron + spike (metal when armored)
+        const armor = maxHp >= 3 ? "#ffcf4a" : (maxHp >= 2 ? "#aeb9c6" : cfg.spike);
+        ctx.beginPath(); ctx.arc(0.50 * r, 0.00 * r, r * 0.17, 0, Math.PI * 2); fillStroke(ctx, armor);
+        polyPath(ctx, r, [[0.50, -0.12], [0.66, -0.36], [0.62, -0.06]]);
+        fillStroke(ctx, armor);
+        ctx.restore();
+      });
+
+    }
+
+    // ---- head frill spikes + horns (behind the head) -----------------------
+    if (!tiny) [-1, 1].forEach((s) => {
+      ctx.save(); ctx.scale(s, 1);
+      [[[0.50, -0.70], [1.02, -0.88], [0.62, -0.52]], [[0.60, -0.52], [1.10, -0.54], [0.66, -0.36]], [[0.62, -0.38], [1.00, -0.18], [0.60, -0.24]]].forEach((pts) => {
+        polyPath(ctx, r, pts); fillStroke(ctx, cfg.spike);
+      });
+      ctx.restore();
+    });
+    drawDragonHorn(ctx, r, cfg, outline);
+    ctx.save(); ctx.scale(-1, 1); drawDragonHorn(ctx, r, cfg, outline); ctx.restore();
+
+    // ---- crest spikes ------------------------------------------------------
+    [[0, -0.78, 0.22], [-0.13, -0.77, 0.15], [0.13, -0.77, 0.15]].forEach(([x, y, h]) => {
+      polyPath(ctx, r, [[x - 0.06, y + 0.03], [x, y - h], [x + 0.06, y + 0.03]]);
+      fillStroke(ctx, cfg.spike);
+    });
+    if (anim.isBoss && cfg.crown) {
+      [-0.36, -0.18, 0, 0.18, 0.36].forEach((x, i) => {
+        const h = i === 2 ? 0.26 : 0.18;
+        polyPath(ctx, r, [[x - 0.07, -0.74], [x, -0.74 - h - 0.06], [x + 0.07, -0.74]]);
+        fillStroke(ctx, cfg.crown);
+      });
+    } else if (maxHp >= 3) {
+      polyPath(ctx, r, [[-0.10, -0.76], [0, -1.0], [0.10, -0.76]]);
+      fillStroke(ctx, "#ffcf4a");
+    }
+
+    // ---- head: cranium with cheek spikes ----------------------------------
+    const cranium = [[0, -0.80], [0.30, -0.76], [0.56, -0.64], [0.72, -0.44], [0.56, -0.38],
+      [0.62, -0.20], [0.42, -0.14], [-0.42, -0.14], [-0.62, -0.20], [-0.56, -0.38],
+      [-0.72, -0.44], [-0.56, -0.64], [-0.30, -0.76]];
+    polyPath(ctx, r, cranium);
+    fillStroke(ctx, cfg.body);
+    // darker forehead scale line for depth
+    ctx.save();
+    polyPath(ctx, r, cranium); ctx.clip();
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.beginPath(); ctx.ellipse(0, -0.86 * r, r * 0.62, r * 0.20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath(); ctx.ellipse(-0.30 * r, -0.64 * r, r * 0.22, r * 0.07, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // ---- mouth: dark interior, throat glow, tongue, fangs, chin -----------
+    const yU = -0.14, yL = yU + 0.03 + mouth * 0.24;
+    polyPath(ctx, r, [[-0.40, yU], [0.40, yU], [0.34, yL], [-0.34, yL]]);
+    ctx.fillStyle = "#2a0608"; ctx.fill();
+    if (!tiny) {
+      ctx.save();
+      ctx.clip();
+      const mg = ctx.createRadialGradient(0, (yU + yL) / 2 * r, 0, 0, (yU + yL) / 2 * r, r * 0.34);
+      mg.addColorStop(0, rgba(cfg.mouth, 0.95)); mg.addColorStop(1, rgba(cfg.mouth, 0));
+      ctx.fillStyle = mg; ctx.fillRect(-0.5 * r, yU * r, r, (yL - yU) * r);
+      ctx.fillStyle = "#c8505f";
+      ctx.beginPath(); ctx.ellipse(0, (yL - 0.015) * r, r * 0.17, r * 0.05 + mouth * r * 0.03, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.strokeStyle = outline; ctx.lineWidth = lw;
+    polyPath(ctx, r, [[-0.40, yU], [0.40, yU], [0.34, yL], [-0.34, yL]]); ctx.stroke();
+    // chin / lower jaw
+    polyPath(ctx, r, [[-0.40, yL - 0.02], [-0.34, yL], [0.34, yL], [0.40, yL - 0.02], [0.30, yL + 0.14], [0, yL + 0.21], [-0.30, yL + 0.14]]);
+    fillStroke(ctx, shade(cfg.body, -0.12));
+    // fangs
+    [[-0.34, 0.12], [-0.22, 0.17], [-0.10, 0.11], [0.10, 0.11], [0.22, 0.17], [0.34, 0.12]].forEach(([x, h]) => {
+      polyPath(ctx, r, [[x - 0.045, yU], [x, yU + h], [x + 0.045, yU]]);
+      fillStroke(ctx, "#fbf4dc");
+    });
+    [[-0.26, 0.10], [-0.10, 0.07], [0.10, 0.07], [0.26, 0.10]].forEach(([x, h]) => {
+      polyPath(ctx, r, [[x - 0.04, yL], [x, yL - h], [x + 0.04, yL]]);
+      fillStroke(ctx, "#fbf4dc");
+    });
+
+    // ---- snout ridge + nostrils --------------------------------------------
+    polyPath(ctx, r, [[-0.10, -0.54], [0.10, -0.54], [0.15, -0.28], [0.08, -0.19], [-0.08, -0.19], [-0.15, -0.28]]);
+    fillStroke(ctx, shade(cfg.body, 0.14));
+    ctx.fillStyle = "#1a0a0a";
+    [-1, 1].forEach((s) => { ctx.beginPath(); ctx.ellipse(s * 0.065 * r, -0.26 * r, r * 0.032, r * 0.022, 0, 0, Math.PI * 2); ctx.fill(); });
+
+    // ---- eyes: narrow, glowing, under heavy scowling brows -----------------
+    [-1, 1].forEach((s) => {
+      ctx.save(); ctx.scale(s, 1);
+      ctx.beginPath();
+      ctx.moveTo(0.09 * r, -0.46 * r);
+      ctx.quadraticCurveTo(0.27 * r, -0.71 * r, 0.50 * r, -0.62 * r);
+      ctx.quadraticCurveTo(0.32 * r, -0.44 * r, 0.09 * r, -0.46 * r);
+      ctx.closePath();
+      fillStroke(ctx, cfg.eye);
+      ctx.fillStyle = "#14080a";
+      ctx.beginPath(); ctx.ellipse(0.29 * r, -0.555 * r, r * 0.03, r * 0.08, 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    });
+    // additive glow so the eyes burn
+    if (!tiny) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      [-1, 1].forEach((s) => {
+        const ex = s * 0.29 * r, ey = -0.55 * r;
+        const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, r * 0.26);
+        g.addColorStop(0, rgba(cfg.eye, 0.35 + 0.2 * pulse)); g.addColorStop(1, rgba(cfg.eye, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, r * 0.26, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
+    }
+    // brows: thick, slanting down toward the nose
+    [-1, 1].forEach((s) => {
+      ctx.save(); ctx.scale(s, 1);
+      polyPath(ctx, r, [[0.03, -0.55], [0.54, -0.80], [0.56, -0.70], [0.42, -0.66], [0.07, -0.47]]);
+      fillStroke(ctx, shade(cfg.body, -0.45));
+      ctx.restore();
+    });
+    if (cfg.visor) {
+      ctx.fillStyle = "rgba(10,12,16,0.55)";
+      polyPath(ctx, r, [[-0.50, -0.58], [0.50, -0.58], [0.44, -0.50], [-0.44, -0.50]]); ctx.fill();
+    }
+
+    // ---- species extras -----------------------------------------------------
+    if (cfg.gear && detail) {
+      drawCog(ctx, 0, -0.66 * r, r * 0.13, 8, t * 1.5, "#c6a15a", outline);
+    }
+    if (cfg.fireGlow) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 3; i++) {
+        const k = (t * 0.9 + i / 3) % 1;
+        ctx.fillStyle = `rgba(255,${150 + i * 30},60,${0.8 * (1 - k)})`;
+        ctx.beginPath(); ctx.arc((i - 1) * 0.07 * r + Math.sin(t * 6 + i) * r * 0.02, (-0.28 - k * 0.38) * r, r * (0.045 - k * 0.02), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ---- armor plates on the head (HP tiers) -------------------------------
+    if (maxHp >= 2) {
+      polyPath(ctx, r, [[-0.20, -0.66], [0.20, -0.66], [0.14, -0.58], [-0.14, -0.58]]);
+      fillStroke(ctx, maxHp >= 3 ? "#ffcf4a" : "#aeb9c6");
+    }
+    ctx.restore();
+  }
 
   // Monster HP mix by level index within a world (0 = first level, 2 = boss
   // level). Level 1 is always single-hit; later levels mix in armored (2 HP)
@@ -946,9 +1529,13 @@
 
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
-    ctx2d.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap: full redraw every frame
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+    view = computeView(rect.width, rect.height);
+    view.dpr = dpr;
+    layersCache = {}; // scenery is repainted for the new size
   }
 
   // =========================================================================
@@ -986,6 +1573,11 @@
     cannonStreak: 0,          // consecutive correct answers, drives cannon upgrades
     cannonLevel: 0,           // 0 = base, 1 = upgraded barrel, 2 = dual cannon
     pendingCannonDowngrade: false, // set on a wrong answer; applied at the next wave boundary, not instantly
+    cannonSpread: 0,          // 0 = single centred cannon, 1 = two cannons side by side (animated)
+    muzzleFlash: 0,           // 1 -> 0 flash at the muzzle right after firing
+    shake: 0,                 // 1 -> 0 camera shake when a dragon hits the wall
+    flash: 0,                 // 1 -> 0 red screen edge flash when a heart is lost
+    laneBag: [],              // shuffled lanes so dragons spread across the width
   };
 
   function currentLevel() {
@@ -1076,17 +1668,9 @@
   function triggerCannonUpgradeEffect(level) {
     Audio_.upgrade();
     showFeedback(level >= 2 ? t("cannonUpgraded2") : t("cannonUpgraded1"), "#e8a400");
-    const rect = canvas.getBoundingClientRect();
-    const muzzle = getCannonMuzzle(rect);
-    for (let i = 0; i < 16; i++) {
-      state.particles.push({
-        x: muzzle.x, y: muzzle.y,
-        vx: (Math.random() - 0.5) * 7,
-        vy: (Math.random() - 0.5) * 7 - 2,
-        life: 30,
-        color: `hsl(${45 + Math.random() * 15}, 95%, ${60 + Math.random() * 20}%)`,
-      });
-    }
+    const pose = cannonPose(0, null);
+    burst(pose.mx, pose.my, 20, { hue: 45, hueRange: 15, speed: 6, up: 2, life: 34, r: 5, light: 68 });
+    shockRing(pose.mx, pose.my, "rgba(255,214,77,0.95)", pose.u * 1.2);
   }
 
   function showFeedback(text, color) {
@@ -1095,6 +1679,51 @@
     el.style.color = color || "#333";
     clearTimeout(showFeedback._t);
     showFeedback._t = setTimeout(() => { el.textContent = " "; }, 1200);
+  }
+
+  // =========================================================================
+  // FIRST-PERSON VIEW — the player stands on the castle rampart behind a
+  // cannon and looks out at the horizon. Dragons spawn far away (p = 0) and
+  // charge straight at the camera; p = 1 means they have reached the wall.
+  // Everything on screen derives from p, a lane (left/right offset) and a
+  // hover height, so BALANCE speeds keep their old meaning: "px per frame
+  // along a lane BALANCE.TRAVEL_DISTANCE_PX long".
+  // =========================================================================
+  const VIEW = {
+    HORIZON: 0.40,        // horizon line, as a fraction of canvas height
+    WALL_TOP: 0.86,       // where an arriving dragon touches the wall
+    FAR_SCALE: 0.22,      // apparent size at spawn relative to arrival size
+    APPROACH_CURVE: 1.6,  // >1 = stays small for longer, then looms quickly
+    SPRITE_H: 0.50,       // dragon height at arrival, fraction of canvas height
+    LANE_REACH: 0.34,     // lateral reach at arrival, fraction of canvas width
+  };
+
+  function computeView(w, h) {
+    return {
+      w, h, cx: w / 2,
+      horizonY: h * VIEW.HORIZON,
+      wallTopY: h * VIEW.WALL_TOP,
+      spriteBase: Math.min(h * VIEW.SPRITE_H, w * 0.5),
+      laneReach: w * VIEW.LANE_REACH,
+      dpr: 1,
+    };
+  }
+  let view = computeView(800, 500);
+
+  function scaleAt(p) {
+    return VIEW.FAR_SCALE + (1 - VIEW.FAR_SCALE) * Math.pow(Math.min(1, Math.max(0, p)), VIEW.APPROACH_CURVE);
+  }
+
+  // Projects a dragon's (p, lane, hover) onto the screen. Called every frame
+  // for every dragon so logic (aiming, hits) and drawing share one answer.
+  function layoutMonster(m) {
+    const v = view;
+    const s = scaleAt(m.p);
+    m.s = s;
+    m.size = v.spriteBase * m.scale * s;
+    m.groundY = v.horizonY + (v.wallTopY - v.horizonY) * s;
+    m.sx = v.cx + m.lane * v.laneReach * s;
+    m.sy = m.groundY - m.hover * v.spriteBase * s - m.size / 2;
   }
 
   // =========================================================================
@@ -1114,6 +1743,14 @@
     );
   }
 
+  function waveDotsHtml(current) {
+    let s = "";
+    for (let i = 1; i <= BALANCE.TOTAL_WAVES; i++) {
+      s += `<i class="dot${i < current ? " done" : (i === current ? " now" : "")}"></i>`;
+    }
+    return s;
+  }
+
   function startWave(waveNum) {
     const world = currentWorld();
     const lvl = currentLevel();
@@ -1125,8 +1762,9 @@
     state.spawnIntervalMs = spawnIntervalForWave(waveNum);
     state.spawnTimer = 0;
     state.waveInProgress = true;
-    document.getElementById("waveInfo").textContent =
-      `${world.emoji} ${t("levelLabel")} ${lvl.id}: ${levelName(world.id, lvl.id)} — ${t("waveLabel")} ${waveNum}/${BALANCE.TOTAL_WAVES}`;
+    document.getElementById("waveInfo").innerHTML =
+      `<span class="waveName">${world.emoji} ${t("levelLabel")} ${lvl.id}: ${levelName(world.id, lvl.id)}</span>` +
+      `<span class="waveDots" title="${t("waveLabel")} ${waveNum}/${BALANCE.TOTAL_WAVES}">${waveDotsHtml(waveNum)}</span>`;
 
     // Cannon downgrades only take effect at a wave boundary, never mid-wave.
     if (state.pendingCannonDowngrade) {
@@ -1138,91 +1776,135 @@
     }
   }
 
+  // Lanes are dealt from a shuffled "bag" so consecutive dragons spread
+  // across the whole width instead of piling into one column.
+  function nextLane() {
+    if (!state.laneBag || state.laneBag.length === 0) {
+      const bag = [-0.85, -0.45, 0, 0.45, 0.85];
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = randInt(0, i);
+        const tmp = bag[i]; bag[i] = bag[j]; bag[j] = tmp;
+      }
+      state.laneBag = bag;
+    }
+    return state.laneBag.pop() + (Math.random() - 0.5) * 0.16;
+  }
+
   function spawnMonster() {
-    const rect = canvas.getBoundingClientRect();
     const world = currentWorld();
     const lvl = currentLevel();
     const isBoss = state.isBossWave && state.monstersRemainingToSpawn === 1;
-    const spawnXFraction = lvl.spawnXFraction || BALANCE.SPAWN_X_FRACTION;
     const speciesList = DRAGON_SPECIES_BY_WORLD[world.id];
     const speciesKey = isBoss ? BOSS_DRAGON_SPECIES_BY_WORLD[world.id] : speciesList[(state.wave - 1) % speciesList.length];
     const isBossWaveOfFinalLevel = state.levelIndex === 2 && state.isBossWave;
     const hpDistribution = isBossWaveOfFinalLevel ? HP_DISTRIBUTION_LEVEL3_BOSS_WAVE : HP_DISTRIBUTION_BY_LEVEL_INDEX[state.levelIndex];
     const hp = isBoss ? BALANCE.BOSS_HP : pickWeighted(hpDistribution);
-    const scale = isBoss ? BALANCE.BOSS_SCALE : 1;
-    const size = BASE_MONSTER_SIZE * scale;
-    // Dragons walk along the grass line, not scattered at random heights —
-    // groundY matches the same line the castle/ground strip is drawn on, with
-    // a tiny per-monster jitter so they don't all form a perfectly flat row.
-    const groundY = getCastleGeometry(rect).groundY;
-    const jitter = randInt(-4, 4);
-    state.monsters.push({
-      x: rect.width * spawnXFraction,
-      y: groundY - size * 0.4 + jitter,
+    const speed = speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : hpSpeedMultiplier(hp));
+    const travelPx = BALANCE.TRAVEL_DISTANCE_PX * (lvl.travelDistanceMultiplier || 1);
+    const m = {
+      p: 0,
+      speedP: speed / travelPx,          // progress per 60fps frame
+      lane: isBoss ? (Math.random() - 0.5) * 0.3 : nextLane(),
+      hover: isBoss ? 0.16 : 0.12 + Math.random() * 0.62,
       speciesKey,
-      speed: speedForWave(state.wave) * (isBoss ? BALANCE.BOSS_SPEED_MULTIPLIER : hpSpeedMultiplier(hp)),
       hp,
       maxHp: hp,
-      isBoss: isBoss,
-      scale,
+      isBoss,
+      scale: isBoss ? BALANCE.BOSS_SCALE : 1,
       dying: false,
       dieTimer: 0,
-      bobOffset: Math.random() * Math.PI * 2,
-      blinkOffset: Math.random() * 3000,
-    });
+      hitTimer: 0,
+      seed: Math.random() * 100,
+    };
+    layoutMonster(m);
+    state.monsters.push(m);
     state.monstersRemainingToSpawn--;
   }
 
-  // Castle geometry is computed once here and reused by both the collision
-  // check (how close a monster must get to reach the castle) and the
-  // renderer (drawCastle/getCannonMuzzle), so the hit boundary always lines
-  // up with the wall's drawn right edge regardless of canvas size.
-  function getCastleGeometry(rect) {
-    const groundY = rect.height * 0.75;
-    const wallHeight = rect.height * 0.5;
-    const wallWidth = Math.max(90, rect.width * 0.14);
-    const wallX = -wallWidth * 0.25; // partially off the left edge is fine
-    const wallY = groundY - wallHeight;
-    const towerWidth = wallWidth * 0.5;
-    const towerHeight = wallHeight * 1.25;
-    const towerX = wallX + wallWidth - towerWidth * 0.55;
-    const towerY = groundY - towerHeight;
-    return { groundY, wallX, wallY, wallWidth, wallHeight, towerX, towerY, towerWidth, towerHeight };
+  // =========================================================================
+  // CANNONS — first-person: you look over the breech of your cannon. The
+  // barrel points at whichever dragon will arrive first. At cannon level 2 a
+  // second cannon slides in beside the first.
+  // =========================================================================
+  function cannonUnit() {
+    return Math.min(view.w * 0.14, view.h * 0.22);
   }
 
-  function getCannonMuzzle(rect) {
-    const g = getCastleGeometry(rect);
-    return { x: g.wallX + g.wallWidth * 0.55, y: g.wallY - 6 };
+  // Menus and the quick-unlock quiz show the plain starting cannon.
+  function resetCannonVisuals() {
+    state.cannonLevel = 0;
+    state.cannonStreak = 0;
+    state.pendingCannonDowngrade = false;
   }
 
-  // Second cannon, unlocked at a 10-answer streak, sits up on the tower.
-  function getSecondCannonMuzzle(rect) {
-    const g = getCastleGeometry(rect);
-    return { x: g.towerX + g.towerWidth * 0.5, y: g.towerY - 6 };
+  // i: 0 = main cannon, 1 = second cannon. target: the dragon it aims at.
+  function cannonPose(i, target) {
+    const v = view;
+    const u = cannonUnit();
+    const spread = state.cannonSpread;
+    const bs = state.cannonLevel >= 1 ? BALANCE.CANNON_TIER1_BARREL_SCALE : 1;
+    const x = v.cx + (i === 0 ? -1 : 1) * v.w * 0.14 * spread;
+    const baseY = v.h * 0.985 + (i === 1 ? (1 - spread) * u * 1.4 : 0);
+    const bx = x;
+    const by = baseY - u * 0.78 + state.cannonRecoil * u * 0.14;
+    let dx = Math.sin(frameTime / 1500 + i * 2) * 0.05, dy = -1;
+    if (target) {
+      const ax = target.sx - bx, ay = target.sy - by;
+      const len = Math.hypot(ax, ay) || 1;
+      dx = ax / len;
+      dy = Math.min(-0.32, ay / len);   // never point below the horizon of the wall
+      const l2 = Math.hypot(dx, dy);
+      dx /= l2; dy /= l2;
+    }
+    const rb = u * 0.36 * bs, rm = u * 0.26 * bs;
+    const L = u * 1.2 * (0.62 + 0.38 * Math.abs(dx)) * bs;
+    return { i, x, baseY, bx, by, dx, dy, rb, rm, L, u, bs, mx: bx + dx * L, my: by + dy * L };
   }
 
-  function castleX() {
-    const rect = canvas.getBoundingClientRect();
-    const g = getCastleGeometry(rect);
-    return g.wallX + g.wallWidth;
+  // =========================================================================
+  // PARTICLES — small helpers shared by hits, upgrades, strikes and popups.
+  // =========================================================================
+  function addParticle(p) {
+    p.maxLife = p.life;
+    if (p.r == null) p.r = 4;
+    state.particles.push(p);
+  }
+  function burst(x, y, count, o) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, sp = (0.3 + Math.random() * 0.7) * (o.speed || 5);
+      addParticle({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - (o.up || 0),
+        life: (o.life || 28) * (0.7 + Math.random() * 0.6),
+        r: (o.r || 4) * (0.6 + Math.random() * 0.8),
+        g: o.g == null ? 0.15 : o.g,
+        color: `hsl(${o.hue + Math.random() * (o.hueRange || 0)}, 95%, ${o.light || 60}%)`,
+      });
+    }
+  }
+  function popText(x, y, text, color) {
+    addParticle({ x, y, vx: 0, vy: -1.2, g: 0, life: 42, text, color });
+  }
+  function shockRing(x, y, color, size) {
+    addParticle({ x, y, vx: 0, vy: 0, g: 0, life: 20, ring: true, r: size * 0.25, grow: size * 0.05, color });
   }
 
   // =========================================================================
   // SHOOTING
   // =========================================================================
-  // Targeting priority is shortest time-to-castle (remaining distance / own
+  // Targeting priority is shortest time-to-wall (remaining progress / own
   // speed), not raw distance. Sorting by distance alone lets a slow, tanky
   // multi-HP dragon get perpetually bypassed by faster newcomers that spawn
   // later but overtake it — "closest" looks locally correct at every instant,
   // yet the slow one can go untouched for its whole approach and reach the
-  // castle. Time-to-impact fixes that: whoever will actually arrive soonest
+  // wall. Time-to-impact fixes that: whoever will actually arrive soonest
   // is engaged first. Ties (near-simultaneous arrival) favor lower remaining
   // HP, so nearly-dead dragons get finished off rather than left dangling.
   function sortByThreat(monsters) {
-    const cx = castleX();
     return monsters.slice().sort((a, b) => {
-      const ta = (a.x - cx) / a.speed;
-      const tb = (b.x - cx) / b.speed;
+      const ta = (1 - a.p) / a.speedP;
+      const tb = (1 - b.p) / b.speedP;
       if (Math.abs(ta - tb) > 1e-6) return ta - tb;
       return a.hp - b.hp;
     });
@@ -1235,26 +1917,31 @@
     const alive = state.monsters.filter(m => !m.dying);
     if (alive.length === 0) return false;
     const sorted = sortByThreat(alive);
-    const rect = canvas.getBoundingClientRect();
     const dual = state.cannonLevel >= 2;
     const targets = dual ? sorted.slice(0, 2) : sorted.slice(0, 1);
-    const muzzles = [getCannonMuzzle(rect)];
-    if (dual) muzzles.push(getSecondCannonMuzzle(rect));
     const speedMult = state.cannonLevel >= 1 ? BALANCE.CANNON_TIER1_SPEED_MULT : 1;
 
     targets.forEach((target, i) => {
-      const muzzle = muzzles[i] || muzzles[0];
-      const dist = Math.max(1, Math.hypot(target.x - muzzle.x, target.y - muzzle.y));
+      const pose = cannonPose(i, target);
+      const dist = Math.max(1, Math.hypot(target.sx - pose.mx, target.sy - pose.my));
       state.cannonballs.push({
-        x: muzzle.x,
-        y: muzzle.y,
+        x: pose.mx,
+        y: pose.my,
         target,
         initialDist: dist,
+        startR: pose.rm * 0.85,
         rotation: 0,
         speedMult,
+        trail: [],
       });
+      burst(pose.mx, pose.my, 7, { hue: 25, hueRange: 25, speed: 3.2, life: 16, r: 3.5, g: -0.02, light: 70 });
+      // smoke drifting up from the muzzle
+      for (let k = 0; k < 3; k++) {
+        addParticle({ x: pose.mx, y: pose.my, vx: (Math.random() - 0.5) * 1.2, vy: -0.5 - Math.random() * 0.8, g: -0.01, life: 34, r: 7 + Math.random() * 5, smoke: true, color: "rgba(230,230,235,0.55)" });
+      }
     });
     state.cannonRecoil = 1;
+    state.muzzleFlash = 1;
     Audio_.shoot();
     return true;
   }
@@ -1262,34 +1949,20 @@
   // Small burst of particles at the cannonball's impact point, distinct from
   // the particles hitMonster() spawns at the monster itself.
   function spawnImpactBurst(x, y) {
-    for (let i = 0; i < 10; i++) {
-      state.particles.push({
-        x, y,
-        vx: (Math.random() - 0.5) * 6,
-        vy: (Math.random() - 0.5) * 6 - 1,
-        life: 20,
-        color: `hsl(${20 + Math.random() * 30}, 95%, ${55 + Math.random() * 15}%)`,
-      });
-    }
+    burst(x, y, 10, { hue: 20, hueRange: 30, speed: 6, up: 1, life: 20, r: 4, light: 62 });
   }
 
-  // An arrow hitting its target: regular monsters die in one hit, the boss
-  // takes BALANCE.BOSS_HP hits before dying.
+  // A cannonball landing: regular monsters die in one hit, the boss takes
+  // BALANCE.BOSS_HP hits before dying.
   function hitMonster(m) {
     m.hp--;
     state.score += BALANCE.SCORE_PER_CORRECT;
     document.getElementById("score").textContent = `${t("scoreLabel")}: ${state.score}`;
     Audio_.hit();
-
-    for (let i = 0; i < 4; i++) {
-      state.particles.push({
-        x: m.x, y: m.y,
-        vx: (Math.random() - 0.5) * 4,
-        vy: (Math.random() - 0.5) * 4 - 1,
-        life: 30,
-        color: `hsl(${Math.random() * 60 + 30}, 90%, 60%)`,
-      });
-    }
+    m.hitTimer = 180;
+    m.p = Math.max(0, m.p - 0.012); // small knock-back
+    burst(m.sx, m.sy, 8, { hue: 30, hueRange: 40, speed: 5, up: 1, life: 28, r: 4 });
+    popText(m.sx, m.sy - m.size * 0.45, `+${BALANCE.SCORE_PER_CORRECT}`, "#fff2a8");
 
     if (m.hp <= 0) {
       m.dying = true;
@@ -1298,19 +1971,23 @@
         state.score += BALANCE.BOSS_KILL_BONUS;
         document.getElementById("score").textContent = `${t("scoreLabel")}: ${state.score}`;
         showFeedback(t("bossDefeated"), "#e8590c");
+        popText(m.sx, m.sy - m.size * 0.6, `+${BALANCE.BOSS_KILL_BONUS}`, "#ffd24d");
+        state.shake = Math.max(state.shake, 0.6);
       }
-      for (let i = 0; i < (m.isBoss ? 20 : 8); i++) {
-        state.particles.push({
-          x: m.x, y: m.y,
-          vx: (Math.random() - 0.5) * 5,
-          vy: (Math.random() - 0.5) * 5 - 1,
-          life: 34,
-          color: `hsl(${Math.random() * 60 + 30}, 90%, 60%)`,
-        });
-      }
+      burst(m.sx, m.sy, m.isBoss ? 30 : 14, { hue: 15, hueRange: 45, speed: 7, up: 1, life: 34, r: 5 });
+      shockRing(m.sx, m.sy, "rgba(255,240,180,0.9)", m.size);
     } else if (m.isBoss) {
       showFeedback(tf("bossHitLeft", { hp: m.hp, maxHp: m.maxHp }), "#e8590c");
     }
+  }
+
+  // A dragon reaching the wall: camera shake + red flash + debris.
+  function onDragonStrike(m) {
+    state.shake = 1;
+    state.flash = 1;
+    const y = view.wallTopY;
+    burst(m.sx, y, 18, { hue: 0, hueRange: 40, speed: 7, up: 3, life: 30, r: 5 });
+    shockRing(m.sx, y, "rgba(255,120,90,0.9)", Math.max(60, m.size));
   }
 
   // =========================================================================
@@ -1337,8 +2014,18 @@
     document.getElementById("bottomPanel").classList.toggle("disabled", !enabled);
   }
 
+  // Word-problem levels reserve three lines of question text, so the panel
+  // (and the 3D scene above it) keeps one height for the whole level.
+  // Menus use the full screen; the question panel only exists while playing.
+  function setMenuLayout(on) {
+    document.getElementById("gameContainer").classList.toggle("menuMode", on);
+  }
+  function setPanelMode(kind) {
+    document.getElementById("bottomPanel").classList.toggle("wordMode", kind === "wordproblem");
+  }
+
   function setHudMode(mode) {
-    document.getElementById("hudNormal").style.display = mode === "quiz" ? "none" : "flex";
+    document.getElementById("hudNormal").style.display = mode === "playing" ? "flex" : "none";
     document.getElementById("quickUnlockBar").style.display = mode === "quiz" ? "flex" : "none";
     if (mode !== "playing") {
       document.getElementById("streakDisplay").style.visibility = "hidden";
@@ -1450,6 +2137,7 @@
       const wp = getWorldProgress(world.id);
       const card = document.createElement("div");
       card.className = "worldCard" + (wp.unlocked ? "" : " locked");
+      card.dataset.world = world.id;
       card.innerHTML =
         `<div class="worldCardEmoji">${wp.unlocked ? world.emoji : "🔒"}</div>` +
         `<div class="worldCardTitle">${t("worldLabel")} ${world.id}: ${worldName(world.id)}</div>` +
@@ -1485,6 +2173,7 @@
       const unlocked = lvl.id <= wp.unlockedLevel;
       const btn = document.createElement("button");
       btn.className = "levelCard" + (unlocked ? "" : " locked");
+      btn.dataset.world = worldId;
       btn.disabled = !unlocked;
       btn.innerHTML =
         `<div class="levelCardEmoji">${unlocked ? lvl.emoji : "🔒"}</div>` +
@@ -1499,6 +2188,11 @@
 
   function showWorldSelect() {
     state.mode = "menu";
+    menuWorldId = 1;
+    resetAmbient();
+    resetCannonVisuals();
+    setPanelMode(null);
+    setMenuLayout(true);
     state.running = false;
     state.inputEnabled = false;
     document.getElementById("overlay").classList.remove("active");
@@ -1515,6 +2209,11 @@
 
   function showLevelSelect(worldId) {
     state.mode = "menu";
+    menuWorldId = worldId;
+    resetAmbient();
+    resetCannonVisuals();
+    setPanelMode(getWorld(worldId).levels[0].kind);
+    setMenuLayout(true);
     state.running = false;
     state.inputEnabled = false;
     document.getElementById("overlay").classList.remove("active");
@@ -1540,6 +2239,8 @@
     state.worldIndex = WORLDS.findIndex(w => w.id === worldId);
     state.levelIndex = getWorld(worldId).levels.findIndex(l => l.id === levelId);
     state.mode = "playing";
+    setPanelMode(currentLevel().kind);
+    setMenuLayout(false);
     document.getElementById("levelSelectOverlay").classList.remove("active");
     document.getElementById("worldSelectOverlay").classList.remove("active");
     setHudMode("playing");
@@ -1553,6 +2254,9 @@
     Audio_.resumeCtx();
     state.mode = "quiz";
     state.quickUnlockWorldId = worldId;
+    resetCannonVisuals();
+    setPanelMode(getWorld(worldId).levels[0].kind);
+    setMenuLayout(false);
     state.quickUnlockStreak = 0;
     state.running = false;
     state.inputEnabled = true;
@@ -1686,7 +2390,10 @@
   // =========================================================================
   // MAIN UPDATE / RENDER LOOP
   // =========================================================================
+  // Gameplay: only runs while a level is in progress.
   function update(dt) {
+    const dtF = dt / 16.6667;
+
     // spawning
     if (state.waveInProgress && state.monstersRemainingToSpawn > 0) {
       state.spawnTimer += dt;
@@ -1696,77 +2403,55 @@
       }
     }
 
-    // monsters
-    const cx = castleX();
+    // dragons charge toward the wall; one that arrives costs a heart
     for (let i = state.monsters.length - 1; i >= 0; i--) {
       const m = state.monsters[i];
       if (m.dying) {
         m.dieTimer += dt;
-        if (m.dieTimer > 300) {
+        layoutMonster(m);
+        if (m.dieTimer > 360) {
           state.monsters.splice(i, 1);
           state.monstersAliveOrPending--;
         }
         continue;
       }
-      m.x -= m.speed * (dt / 16.6667);
-      if (m.x <= cx + 20) {
+      if (m.hitTimer > 0) m.hitTimer -= dt;
+      m.p += m.speedP * dtF;
+      layoutMonster(m);
+      if (m.p >= 1) {
         state.monsters.splice(i, 1);
         state.monstersAliveOrPending--;
+        onDragonStrike(m);
         loseHeart();
       }
     }
 
-    // cannon recoil decay (visual only)
-    if (state.cannonRecoil > 0) {
-      state.cannonRecoil -= dt / 150;
-      if (state.cannonRecoil < 0) state.cannonRecoil = 0;
-    }
-
-    // cannonballs
+    // cannonballs chase their target across the screen
     for (let i = state.cannonballs.length - 1; i >= 0; i--) {
       const ball = state.cannonballs[i];
       if (ball.target.dying || !state.monsters.includes(ball.target)) {
+        burst(ball.x, ball.y, 5, { hue: 200, hueRange: 30, speed: 2.5, life: 14, r: 3, g: 0 });
         state.cannonballs.splice(i, 1);
         continue;
       }
-      const dx = ball.target.x - ball.x;
-      const dy = ball.target.y - ball.y;
+      const dx = ball.target.sx - ball.x;
+      const dy = ball.target.sy - ball.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const speed = BALANCE.CANNONBALL_SPEED * (ball.speedMult || 1) * (dt / 16.6667);
+      const speed = BALANCE.CANNONBALL_SPEED * (ball.speedMult || 1) * dtF;
       // Register a hit whenever this frame's movement would reach or pass the
-      // target, not just when already within 15px — a large dt (a throttled
+      // target, not just when already close — a large dt (a throttled
       // background tab, a slow device) can otherwise let a fast cannonball
       // overshoot its target in a single step and never register the hit,
-      // wasting the shot while the dragon keeps marching untouched.
-      if (dist < 15 || speed >= dist) {
+      // wasting the shot while the dragon keeps charging untouched.
+      if (dist < Math.max(10, ball.target.size * 0.1) || speed >= dist) {
         hitMonster(ball.target);
-        spawnImpactBurst(ball.target.x, ball.target.y);
+        spawnImpactBurst(ball.target.sx, ball.target.sy);
         state.cannonballs.splice(i, 1);
       } else {
+        ball.trail.push({ x: ball.x, y: ball.y, r: Math.max(2, ball.startR * (dist / ball.initialDist) * 0.8) });
+        if (ball.trail.length > 6) ball.trail.shift();
         ball.x += (dx / dist) * speed;
         ball.y += (dy / dist) * speed;
-        ball.rotation += 0.25 * (dt / 16.6667);
-      }
-    }
-
-    // particles
-    for (let i = state.particles.length - 1; i >= 0; i--) {
-      const p = state.particles[i];
-      p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
-      if (p.life <= 0) state.particles.splice(i, 1);
-    }
-
-    // confetti
-    if (confetti.length > 0) {
-      const rect = canvas.getBoundingClientRect();
-      for (const c of confetti) {
-        c.y += c.vy * (dt / 16.6667);
-        c.x += c.vx * (dt / 16.6667);
-        c.rot += c.vrot;
-        if (c.y > rect.height + 20) {
-          c.y = -20;
-          c.x = Math.random() * rect.width;
-        }
       }
     }
 
@@ -1789,11 +2474,70 @@
     }
   }
 
+  // Visual-only state: keeps settling after the game ends so a final
+  // explosion or screen shake never freezes behind the result overlay.
+  function updateEffects(dt) {
+    const dtF = dt / 16.6667;
+    state.cannonRecoil = Math.max(0, state.cannonRecoil - dt / 150);
+    state.muzzleFlash = Math.max(0, state.muzzleFlash - dt / 110);
+    state.shake = Math.max(0, state.shake - dt / 380);
+    state.flash = Math.max(0, state.flash - dt / 650);
+    state.cannonSpread += ((state.cannonLevel >= 2 ? 1 : 0) - state.cannonSpread) * Math.min(1, dt / 180);
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += p.vx * dtF; p.y += p.vy * dtF; p.vy += (p.g == null ? 0.15 : p.g) * dtF;
+      if (p.ring) p.r += p.grow * dtF;
+      p.life -= dtF;
+      if (p.life <= 0) state.particles.splice(i, 1);
+    }
+
+    if (confetti.length > 0) {
+      for (const c of confetti) {
+        c.y += c.vy * dtF;
+        c.x += c.vx * dtF;
+        c.rot += c.vrot * dtF;
+        if (c.y > view.h + 20) {
+          c.y = -20;
+          c.x = Math.random() * view.w;
+        }
+      }
+    }
+  }
+
+  function loop(timestamp) {
+    if (!state.lastFrameTime) state.lastFrameTime = timestamp;
+    // Clamp: after a hidden tab or a long hitch the game just resumes instead
+    // of teleporting every dragon to the wall.
+    const dt = Math.min(100, timestamp - state.lastFrameTime);
+    state.lastFrameTime = timestamp;
+    frameTime = timestamp;
+
+    if (state.running) update(dt);
+    else if (state.mode === "menu") updateAmbient(dt);
+    updateEffects(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
   // =========================================================================
-  // CANVAS ART — castle, cannon, and monster shapes. No image assets; every
-  // creature is body + eyes + feet drawn with primitives, animated with a
-  // walking bob, an occasional blink, and a squash-then-pop death animation.
+  // SCENERY — procedural, painted once per world/size into cached layers
+  // (sky, land, wall) that are blitted every frame. Clouds, cogs, stars,
+  // islands, smoke and windmill blades animate live between the layers.
+  // Palettes follow the Canva concept art for each world.
   // =========================================================================
+  let frameTime = 0;
+
+  function mulberry32(seed) {
+    let a = seed | 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let x = Math.imul(a ^ (a >>> 15), 1 | a);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   function roundRectPath(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -1804,406 +2548,724 @@
     ctx.closePath();
   }
 
-  function drawCastle(ctx, rect) {
-    const g = getCastleGeometry(rect);
-    // main wall with a simple brick texture
-    ctx.fillStyle = "#9a9a9a";
-    ctx.fillRect(g.wallX, g.wallY, g.wallWidth, g.wallHeight);
-    ctx.strokeStyle = "rgba(0,0,0,0.15)";
-    ctx.lineWidth = 1;
-    const rowH = 18;
-    const rows = Math.ceil(g.wallHeight / rowH);
-    for (let row = 0; row <= rows; row++) {
-      const y = g.wallY + row * rowH;
-      ctx.beginPath(); ctx.moveTo(g.wallX, y); ctx.lineTo(g.wallX + g.wallWidth, y); ctx.stroke();
+  const THEMES = {
+    1: { // sunny meadow kingdom
+      sky: [[0, "#3f9df0"], [0.55, "#8fd2ff"], [1, "#e4f6ff"]],
+      haze: "228,246,255",
+      stone: { base: "#a3a9b3", light: "#d3d8e0", dark: "#6e7580", mortar: "rgba(40,45,60,0.38)" },
+      floor: ["#b7b0a2", "#8c8576"],
+    },
+    2: { // clockwork valley at sunset
+      sky: [[0, "#d9662a"], [0.5, "#ffa95f"], [1, "#ffe5b4"]],
+      haze: "255,222,170",
+      stone: { base: "#9a7656", light: "#c79c72", dark: "#5f442f", mortar: "rgba(35,18,6,0.42)" },
+      floor: ["#a47a55", "#6d4c33"],
+    },
+    3: { // mystic twilight
+      sky: [[0, "#120a3c"], [0.5, "#4f2594"], [1, "#e07bb6"]],
+      haze: "224,140,190",
+      stone: { base: "#5d6289", light: "#8d93c2", dark: "#34385c", mortar: "rgba(8,8,36,0.5)" },
+      floor: ["#3d4172", "#22264e"],
+    },
+  };
+
+  // ---- small painting helpers ---------------------------------------------
+  function ridge(g, w, baseY, amp, seed, fill) {
+    const rnd = mulberry32(seed);
+    const a = rnd() * 6.28, b = rnd() * 6.28, c = rnd() * 6.28;
+    g.beginPath();
+    g.moveTo(-6, baseY + amp);
+    for (let x = -6; x <= w + 6; x += 6) {
+      const k = x / w;
+      g.lineTo(x, baseY - amp * (0.55 + 0.25 * Math.sin(k * 4.2 + a) + 0.15 * Math.sin(k * 9.5 + b) + 0.06 * Math.sin(k * 23 + c)));
     }
-    for (let row = 0; row < rows; row++) {
-      const y = g.wallY + row * rowH;
-      const offset = row % 2 === 0 ? 0 : 15;
-      for (let bx = g.wallX + offset; bx < g.wallX + g.wallWidth; bx += 30) {
-        ctx.beginPath(); ctx.moveTo(bx, y); ctx.lineTo(bx, y + rowH); ctx.stroke();
-      }
-    }
-    // battlements along the top of the wall
-    ctx.fillStyle = "#9a9a9a";
-    const crenelCount = 5;
-    const crenelW = g.wallWidth / (crenelCount * 2 - 1);
-    for (let i = 0; i < crenelCount; i++) {
-      ctx.fillRect(g.wallX + i * crenelW * 2, g.wallY - 14, crenelW, 14);
-    }
-    // tower
-    ctx.fillStyle = "#8a8a8a";
-    ctx.fillRect(g.towerX, g.towerY, g.towerWidth, g.towerHeight);
-    const towerRows = Math.ceil(g.towerHeight / rowH);
-    for (let row = 0; row <= towerRows; row++) {
-      const y = g.towerY + row * rowH;
-      ctx.beginPath(); ctx.moveTo(g.towerX, y); ctx.lineTo(g.towerX + g.towerWidth, y); ctx.stroke();
-    }
-    ctx.fillStyle = "#8a8a8a";
-    const towerCrenelCount = 3;
-    const towerCrenelW = g.towerWidth / (towerCrenelCount * 2 - 1);
-    for (let i = 0; i < towerCrenelCount; i++) {
-      ctx.fillRect(g.towerX + i * towerCrenelW * 2, g.towerY - 12, towerCrenelW, 12);
-    }
-    // flag
-    ctx.strokeStyle = "#5a3a1a"; ctx.lineWidth = 3;
-    const flagPoleX = g.towerX + g.towerWidth * 0.5;
-    ctx.beginPath(); ctx.moveTo(flagPoleX, g.towerY - 12); ctx.lineTo(flagPoleX, g.towerY - 40); ctx.stroke();
-    ctx.fillStyle = "#e05a5a";
-    ctx.beginPath();
-    ctx.moveTo(flagPoleX, g.towerY - 40);
-    ctx.lineTo(flagPoleX + 22, g.towerY - 33);
-    ctx.lineTo(flagPoleX, g.towerY - 26);
-    ctx.closePath();
-    ctx.fill();
-    // arched door at the base of the wall
-    ctx.fillStyle = "#5a3a1a";
-    const doorW = g.wallWidth * 0.3, doorH = g.wallHeight * 0.35;
-    const doorX = g.wallX + g.wallWidth * 0.25;
-    const doorY = g.groundY - doorH;
-    ctx.beginPath();
-    ctx.moveTo(doorX, doorY + doorH);
-    ctx.lineTo(doorX, doorY + doorH * 0.3);
-    ctx.quadraticCurveTo(doorX, doorY, doorX + doorW / 2, doorY);
-    ctx.quadraticCurveTo(doorX + doorW, doorY, doorX + doorW, doorY + doorH * 0.3);
-    ctx.lineTo(doorX + doorW, doorY + doorH);
-    ctx.closePath();
-    ctx.fill();
+    g.lineTo(w + 6, baseY + amp);
+    g.closePath();
+    g.fillStyle = fill;
+    g.fill();
   }
 
-  function drawCannon(ctx, muzzle, aimAngle, recoil, barrelScale) {
-    barrelScale = barrelScale || 1;
-    ctx.save();
-    ctx.translate(muzzle.x, muzzle.y);
-    ctx.fillStyle = "#3a2a1a";
-    ctx.beginPath(); ctx.arc(0, 4, 10 * barrelScale, 0, Math.PI * 2); ctx.fill();
-    ctx.rotate(aimAngle);
-    const recoilOffset = -recoil * 8;
-    ctx.fillStyle = "#333";
-    roundRectPath(ctx, recoilOffset - 2, -7 * barrelScale, 36 * barrelScale, 14 * barrelScale, 6 * barrelScale);
-    ctx.fill();
-    ctx.fillStyle = "#222";
-    ctx.beginPath(); ctx.arc(recoilOffset, 0, 8 * barrelScale, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-
-  function drawDragonEye(ctx, x, y, r, isBlinking) {
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.ellipse(x, y, r, isBlinking ? r * 0.15 : r, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (!isBlinking) {
-      ctx.fillStyle = "#222";
-      ctx.beginPath(); ctx.arc(x - r * 0.25, y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+  function peaks(g, w, baseY, maxH, seed, fill, snow) {
+    const rnd = mulberry32(seed);
+    const tops = [];
+    g.fillStyle = fill;
+    g.beginPath();
+    g.moveTo(-10, baseY + 4);
+    let x = -10;
+    while (x < w + 40) {
+      const pw = w * (0.07 + rnd() * 0.07), ph = maxH * (0.45 + rnd() * 0.55);
+      tops.push({ x: x + pw / 2, y: baseY - ph, pw, ph });
+      g.lineTo(x + pw / 2, baseY - ph);
+      g.lineTo(x + pw, baseY - ph * (0.12 + rnd() * 0.22));
+      x += pw;
     }
-  }
-
-  // Wing silhouette is the main species "family" cue: membrane (natural
-  // dragons), mechanical (rigid panel, World 2), or feather (owl-winged).
-  function drawDragonWings(ctx, r, cfg, wingFlap) {
-    ctx.save();
-    ctx.translate(r * 0.05, -r * 0.05);
-    ctx.rotate(-0.5 - wingFlap * 0.5);
-    ctx.fillStyle = cfg.wingColor;
-    if (cfg.wing === "feather") {
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(r * (0.9 - i * 0.15), -r * (0.5 + i * 0.22), r * (0.25 - i * 0.05), -r * 0.1);
-        ctx.closePath();
-        ctx.fill();
-      }
-    } else if (cfg.wing === "mechanical") {
-      roundRectPath(ctx, -r * 0.08, -r * 0.9, r * 0.28, r * 0.85, r * 0.08);
-      ctx.fill();
-      ctx.fillStyle = "#2a2a2a";
-      ctx.beginPath(); ctx.arc(r * 0.06, -r * 0.05, r * 0.09, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = cfg.wingColor;
-      roundRectPath(ctx, r * 0.02, -r * 0.65, r * 0.2, r * 0.55, r * 0.06);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(r * 1.0, -r * 0.85, r * 0.2, -r * 0.1);
-      ctx.quadraticCurveTo(r * 0.55, -r * 0.4, 0, 0);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  // Horn style is the secondary species cue: natural curved horn, a
-  // mechanical antenna, a feather tuft, or a faceted crystal.
-  function drawDragonHorns(ctx, r, cfg) {
-    const hx = -r * 0.85, hy = -r * 0.15;
-    ctx.fillStyle = cfg.horn;
-    if (cfg.hornType === "antenna") {
-      ctx.strokeStyle = cfg.horn; ctx.lineWidth = r * 0.05;
-      ctx.beginPath(); ctx.moveTo(hx, hy - r * 0.3); ctx.lineTo(hx - r * 0.05, hy - r * 0.6); ctx.stroke();
-      ctx.beginPath(); ctx.arc(hx - r * 0.05, hy - r * 0.65, r * 0.08, 0, Math.PI * 2); ctx.fill();
-    } else if (cfg.hornType === "tuft") {
-      ctx.beginPath(); ctx.moveTo(hx + r * 0.1, hy - r * 0.25); ctx.lineTo(hx - r * 0.15, hy - r * 0.55); ctx.lineTo(hx + r * 0.2, hy - r * 0.35); ctx.closePath(); ctx.fill();
-    } else if (cfg.hornType === "crystal") {
-      ctx.beginPath(); ctx.moveTo(hx, hy - r * 0.25); ctx.lineTo(hx - r * 0.12, hy - r * 0.55); ctx.lineTo(hx + r * 0.08, hy - r * 0.4); ctx.closePath(); ctx.fill();
-    } else {
-      ctx.beginPath(); ctx.moveTo(hx + r * 0.05, hy - r * 0.25); ctx.quadraticCurveTo(hx - r * 0.2, hy - r * 0.55, hx - r * 0.05, hy - r * 0.15); ctx.closePath(); ctx.fill();
-    }
-  }
-
-  function drawDragonSpecialFeatures(ctx, r, cfg) {
-    if (cfg.fireGlow) {
-      ctx.fillStyle = "rgba(255,150,50,0.55)";
-      ctx.beginPath(); ctx.ellipse(-r * 1.05, r * 0.02, r * 0.18, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-    }
-    if (cfg.runeGlow) {
-      ctx.fillStyle = "rgba(210,180,255,0.9)";
-      [[-r * 0.2, -r * 0.05], [r * 0.1, r * 0.15], [-r * 0.45, r * 0.1]].forEach(([px, py]) => {
-        ctx.beginPath(); ctx.arc(px, py, r * 0.05, 0, Math.PI * 2); ctx.fill();
+    g.lineTo(w + 40, baseY + 4);
+    g.closePath();
+    g.fill();
+    if (snow) {
+      g.fillStyle = "rgba(255,255,255,0.92)";
+      tops.forEach((p) => {
+        if (p.ph < maxH * 0.62) return;
+        const cw = p.pw * 0.2, ch = p.ph * 0.24;
+        g.beginPath();
+        g.moveTo(p.x, p.y);
+        g.lineTo(p.x - cw, p.y + ch);
+        g.lineTo(p.x - cw * 0.3, p.y + ch * 0.7);
+        g.lineTo(p.x + cw * 0.15, p.y + ch);
+        g.lineTo(p.x + cw, p.y + ch * 0.8);
+        g.closePath();
+        g.fill();
       });
     }
   }
 
-  // Visual cue for HP: 2-HP dragons get metal armor plates on the back,
-  // 3-HP "elite" dragons get gold plates plus a small crest spike.
-  function drawHpModifiers(ctx, r, maxHp) {
-    if (maxHp >= 2) {
-      ctx.fillStyle = maxHp >= 3 ? "rgba(255,215,80,0.9)" : "rgba(130,140,150,0.9)";
-      [[-r * 0.25, -r * 0.32], [r * 0.05, -r * 0.36], [r * 0.32, -r * 0.24]].forEach(([px, py]) => {
-        roundRectPath(ctx, px - r * 0.11, py - r * 0.065, r * 0.22, r * 0.13, r * 0.04);
-        ctx.fill();
+  function cloudShape(g, x, y, s, a) {
+    g.fillStyle = `rgba(255,255,255,${a})`;
+    g.beginPath();
+    [[0, 0, 1], [0.95, -0.28, 1.25], [1.95, -0.1, 1.1], [2.8, 0.06, 0.85], [-0.85, 0.12, 0.8]].forEach(([dx, dy, r]) => {
+      g.moveTo(x + dx * s + r * s, y + dy * s);
+      g.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2);
+    });
+    g.fill();
+    g.fillStyle = `rgba(140,175,225,${a * 0.28})`;
+    g.beginPath();
+    g.ellipse(x + 1.0 * s, y + 0.75 * s, 2.5 * s, 0.32 * s, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  function cogPath(g, x, y, rad, teeth, rot) {
+    g.beginPath();
+    const n = teeth * 4;
+    for (let i = 0; i < n; i++) {
+      const a = rot + (i / n) * Math.PI * 2;
+      const rr = i % 4 < 2 ? rad : rad * 0.8;
+      g[i ? "lineTo" : "moveTo"](x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    g.closePath();
+  }
+
+  function drawCogShape(g, x, y, rad, teeth, rot, fill, dark) {
+    cogPath(g, x, y, rad, teeth, rot);
+    g.fillStyle = fill; g.fill();
+    g.lineWidth = Math.max(1, rad * 0.04); g.strokeStyle = dark; g.stroke();
+    g.beginPath(); g.arc(x, y, rad * 0.62, 0, Math.PI * 2);
+    g.strokeStyle = dark; g.stroke();
+    g.fillStyle = dark;
+    g.beginPath(); g.arc(x, y, rad * 0.2, 0, Math.PI * 2); g.fill();
+    for (let k = 0; k < 4; k++) {
+      const a = rot + k * Math.PI / 2;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * rad * 0.62, y + Math.sin(a) * rad * 0.62);
+      g.lineWidth = rad * 0.1; g.stroke();
+    }
+  }
+
+  // Ground with perspective bands + optional converging grid lines.
+  function paintGround(g, w, h, hy, cA, cB, theme, grid) {
+    const N = 18;
+    for (let i = 0; i < N; i++) {
+      const y0 = hy + (h - hy) * Math.pow(i / N, 1.9);
+      const y1 = hy + (h - hy) * Math.pow((i + 1) / N, 1.9);
+      g.fillStyle = i % 2 ? cA : cB;
+      g.fillRect(0, y0, w, y1 - y0 + 1);
+    }
+    if (grid) {
+      g.strokeStyle = grid.color; g.lineWidth = grid.width || 1;
+      for (let k = -9; k <= 9; k++) {
+        g.beginPath();
+        g.moveTo(w / 2 + k * w * 0.012, hy);
+        g.lineTo(w / 2 + k * w * 0.2, h);
+        g.stroke();
+      }
+    }
+    // atmospheric haze hugging the horizon
+    const hz = g.createLinearGradient(0, hy - h * 0.03, 0, hy + h * 0.14);
+    hz.addColorStop(0, `rgba(${theme.haze},0.0)`);
+    hz.addColorStop(0.25, `rgba(${theme.haze},0.55)`);
+    hz.addColorStop(1, `rgba(${theme.haze},0)`);
+    g.fillStyle = hz;
+    g.fillRect(0, hy - h * 0.03, w, h * 0.17);
+  }
+
+  // ---- sky layers -----------------------------------------------------------
+  function paintSky(g, w, h, hy, worldId) {
+    const theme = THEMES[worldId];
+    const grad = g.createLinearGradient(0, 0, 0, hy);
+    theme.sky.forEach(([o, col]) => grad.addColorStop(o, col));
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, hy + 2);
+    g.fillStyle = theme.sky[theme.sky.length - 1][1];
+    g.fillRect(0, hy, w, h - hy);
+    if (worldId === 1) {
+      const sx = w * 0.82, sy = hy * 0.34;
+      const sg = g.createRadialGradient(sx, sy, 0, sx, sy, h * 0.3);
+      sg.addColorStop(0, "rgba(255,250,210,0.95)"); sg.addColorStop(0.18, "rgba(255,245,190,0.55)"); sg.addColorStop(1, "rgba(255,245,190,0)");
+      g.fillStyle = sg; g.fillRect(0, 0, w, hy);
+      g.fillStyle = "#fffbe0"; g.beginPath(); g.arc(sx, sy, h * 0.045, 0, Math.PI * 2); g.fill();
+    } else if (worldId === 2) {
+      const sx = w * 0.3, sy = hy - h * 0.045;
+      const sg = g.createRadialGradient(sx, sy, 0, sx, sy, h * 0.5);
+      sg.addColorStop(0, "rgba(255,240,190,1)"); sg.addColorStop(0.12, "rgba(255,200,120,0.75)"); sg.addColorStop(1, "rgba(255,160,80,0)");
+      g.fillStyle = sg; g.fillRect(0, 0, w, hy);
+      g.fillStyle = "#fff1c4"; g.beginPath(); g.arc(sx, sy, h * 0.085, 0, Math.PI * 2); g.fill();
+    } else {
+      const mx = w * 0.22, my = hy * 0.36, mr = h * 0.075;
+      const mg = g.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 4);
+      mg.addColorStop(0, "rgba(255,246,220,0.55)"); mg.addColorStop(1, "rgba(200,170,255,0)");
+      g.fillStyle = mg; g.fillRect(0, 0, w, hy);
+      g.fillStyle = "#fff8e4"; g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "rgba(190,175,200,0.45)";
+      [[-0.3, -0.2, 0.22], [0.25, 0.1, 0.3], [-0.1, 0.4, 0.16]].forEach(([dx, dy, r]) => { g.beginPath(); g.arc(mx + dx * mr, my + dy * mr, r * mr, 0, Math.PI * 2); g.fill(); });
+    }
+  }
+
+  // ---- land layers (mountains → ground), transparent above the ridges ------
+  function paintLand(g, w, h, hy, worldId) {
+    const theme = THEMES[worldId];
+    const rnd = mulberry32(worldId * 977);
+    if (worldId === 1) {
+      peaks(g, w, hy + 2, h * 0.2, 11, "#a9bde9", true);
+      peaks(g, w, hy + 2, h * 0.12, 29, "#8fa8de", false);
+      ridge(g, w, hy + 4, h * 0.07, 7, "#93d975");
+      // village on a knoll (right)
+      const kx = w * 0.74, ky = hy - h * 0.006;
+      g.fillStyle = "#7fd062"; g.beginPath(); g.ellipse(kx, ky + h * 0.01, w * 0.17, h * 0.045, 0, Math.PI, 0); g.fill();
+      for (let i = 0; i < 6; i++) {
+        const hx = kx - w * 0.12 + i * w * 0.042 + rnd() * 8, hw = w * 0.026, hh = h * 0.026, yy = ky - (i % 2) * h * 0.012;
+        g.fillStyle = "#f5ead2"; g.fillRect(hx, yy - hh, hw, hh);
+        g.fillStyle = i % 2 ? "#d9503f" : "#c4402f";
+        g.beginPath(); g.moveTo(hx - 2, yy - hh); g.lineTo(hx + hw / 2, yy - hh - h * 0.02); g.lineTo(hx + hw + 2, yy - hh); g.closePath(); g.fill();
+      }
+      // windmill tower (blades are animated live)
+      g.fillStyle = "#efe3c8";
+      g.beginPath(); g.moveTo(w * 0.86 - w * 0.012, ky); g.lineTo(w * 0.86 - w * 0.007, ky - h * 0.1); g.lineTo(w * 0.86 + w * 0.007, ky - h * 0.1); g.lineTo(w * 0.86 + w * 0.012, ky); g.closePath(); g.fill();
+      g.fillStyle = "#b9452f";
+      g.beginPath(); g.moveTo(w * 0.86 - w * 0.01, ky - h * 0.1); g.lineTo(w * 0.86, ky - h * 0.125); g.lineTo(w * 0.86 + w * 0.01, ky - h * 0.1); g.closePath(); g.fill();
+      ridge(g, w, hy + 6, h * 0.045, 23, "#75c85a");
+      // round trees on the near ridge
+      for (let i = 0; i < 14; i++) {
+        const tx = rnd() * w, ty = hy - h * (0.002 + rnd() * 0.012), tr = h * (0.014 + rnd() * 0.012);
+        g.fillStyle = "#6b4a2b"; g.fillRect(tx - 1.5, ty - tr * 0.2, 3, tr * 0.9);
+        g.fillStyle = rnd() > 0.5 ? "#3f9c47" : "#4faa4a";
+        g.beginPath(); g.arc(tx, ty - tr * 0.9, tr, 0, Math.PI * 2); g.fill();
+      }
+      paintGround(g, w, h, hy, "#79cc58", "#6dc04e", theme, { color: "rgba(255,255,255,0.06)", width: 2 });
+      // wildflowers / grass tufts, sized by depth
+      for (let i = 0; i < 90; i++) {
+        const k = Math.pow(rnd(), 1.5), y = hy + h * 0.02 + (h - hy) * k, x = rnd() * w, s = 1 + k * 5;
+        g.fillStyle = "rgba(40,120,50,0.5)"; g.fillRect(x - s * 0.15, y - s * 1.4, s * 0.3, s * 1.4);
+        g.fillStyle = ["#ffffff", "#ffd93d", "#ff8fb1", "#c9a3ff"][i % 4];
+        g.beginPath(); g.arc(x, y - s * 1.5, s * 0.55, 0, Math.PI * 2); g.fill();
+      }
+    } else if (worldId === 2) {
+      ridge(g, w, hy + 4, h * 0.075, 5, "#d98a4a");
+      // factory skyline: boxes, chimneys, glowing windows
+      g.fillStyle = "#7a4a2a";
+      for (let i = 0; i < 12; i++) {
+        const bw = w * (0.04 + rnd() * 0.05), bh = h * (0.02 + rnd() * 0.045), bx = i * w * 0.09 + rnd() * w * 0.03;
+        g.fillRect(bx, hy - bh, bw, bh + 3);
+        if (rnd() > 0.5) { const cw = bw * 0.22; g.fillRect(bx + bw * 0.55, hy - bh - h * 0.05, cw, h * 0.05); g.fillRect(bx + bw * 0.55 - 2, hy - bh - h * 0.054, cw + 4, 4); }
+        g.fillStyle = "rgba(255,200,90,0.85)";
+        for (let k = 0; k < 3; k++) g.fillRect(bx + bw * (0.12 + k * 0.28), hy - bh * 0.7, 3, 3);
+        g.fillStyle = "#7a4a2a";
+      }
+      ridge(g, w, hy + 6, h * 0.04, 17, "#8a512b");
+      // copper pipe along the horizon
+      const pg = g.createLinearGradient(0, hy - 6, 0, hy + 8);
+      pg.addColorStop(0, "#e9a56a"); pg.addColorStop(0.5, "#b86a34"); pg.addColorStop(1, "#6f3d1c");
+      g.fillStyle = pg; g.fillRect(0, hy - 3, w, 9);
+      paintGround(g, w, h, hy, "#a8703f", "#9b6538", theme, { color: "rgba(255,190,110,0.16)", width: 2 });
+      // riveted plates + glowing seams
+      for (let i = 0; i < 70; i++) {
+        const k = Math.pow(rnd(), 1.4), y = hy + h * 0.02 + (h - hy) * k, x = rnd() * w, s = 1 + k * 4;
+        g.fillStyle = "rgba(60,30,10,0.45)"; g.beginPath(); g.arc(x, y, s, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "rgba(255,200,130,0.5)"; g.beginPath(); g.arc(x - s * 0.25, y - s * 0.25, s * 0.4, 0, Math.PI * 2); g.fill();
+      }
+    } else {
+      peaks(g, w, hy + 2, h * 0.17, 41, "#4a2f8f", false);
+      ridge(g, w, hy + 4, h * 0.06, 13, "#3a2478");
+      // temple on the right hill
+      const tx = w * 0.7, ty = hy - h * 0.005;
+      g.fillStyle = "#2c1a63"; g.beginPath(); g.ellipse(tx, ty + h * 0.01, w * 0.15, h * 0.04, 0, Math.PI, 0); g.fill();
+      g.fillStyle = "#7a6cc0"; g.fillRect(tx - w * 0.07, ty - h * 0.012, w * 0.14, h * 0.012);
+      for (let i = 0; i < 6; i++) { g.fillStyle = "#9a8de0"; g.fillRect(tx - w * 0.062 + i * w * 0.0235, ty - h * 0.058, w * 0.008, h * 0.046); }
+      g.fillStyle = "#8d7fd2"; g.beginPath(); g.moveTo(tx - w * 0.075, ty - h * 0.058); g.lineTo(tx, ty - h * 0.092); g.lineTo(tx + w * 0.075, ty - h * 0.058); g.closePath(); g.fill();
+      g.fillStyle = "rgba(255,230,140,0.9)"; g.beginPath(); g.arc(tx, ty - h * 0.062, h * 0.007, 0, Math.PI * 2); g.fill();
+      // crystal clusters on the near ridge
+      ridge(g, w, hy + 6, h * 0.035, 31, "#271657");
+      for (let i = 0; i < 9; i++) {
+        const cx = rnd() * w, cy = hy - h * 0.004, ch = h * (0.02 + rnd() * 0.035);
+        g.fillStyle = i % 2 ? "#6ff0ff" : "#ff7be0";
+        g.beginPath(); g.moveTo(cx - ch * 0.18, cy); g.lineTo(cx, cy - ch); g.lineTo(cx + ch * 0.18, cy); g.closePath(); g.fill();
+        g.fillStyle = "rgba(255,255,255,0.45)"; g.beginPath(); g.moveTo(cx - ch * 0.04, cy); g.lineTo(cx, cy - ch); g.lineTo(cx + ch * 0.06, cy); g.closePath(); g.fill();
+      }
+      paintGround(g, w, h, hy, "#2a2e66", "#232759", theme, { color: "rgba(120,240,255,0.30)", width: 2 });
+      // glowing rune diamonds scattered on the ground
+      for (let i = 0; i < 40; i++) {
+        const k = Math.pow(rnd(), 1.4), y = hy + h * 0.025 + (h - hy) * k, x = rnd() * w, s = 2 + k * 9;
+        g.fillStyle = i % 3 ? "rgba(120,240,255,0.55)" : "rgba(255,130,230,0.55)";
+        g.beginPath(); g.moveTo(x, y - s); g.lineTo(x + s * 0.6, y); g.lineTo(x, y + s * 0.4); g.lineTo(x - s * 0.6, y); g.closePath(); g.fill();
+      }
+    }
+  }
+
+  // ---- foreground: the stone parapet you shoot over --------------------------
+  function paintWall(g, w, h, hy, worldId) {
+    const theme = THEMES[worldId], st = theme.stone;
+    const rnd = mulberry32(worldId * 313);
+    const topY = h * VIEW.WALL_TOP;           // top of the wall's face
+    const faceBottom = h * 0.935;
+    const rowH = h * 0.034, brickW = w * 0.07;
+    // face
+    const fg = g.createLinearGradient(0, topY, 0, faceBottom);
+    fg.addColorStop(0, st.light); fg.addColorStop(0.12, st.base); fg.addColorStop(1, st.dark);
+    g.fillStyle = fg; g.fillRect(0, topY, w, faceBottom - topY);
+    const rows = Math.ceil((faceBottom - topY) / rowH);
+    for (let r = 0; r < rows; r++) {
+      const y = topY + r * rowH, off = (r % 2) * brickW * 0.5;
+      for (let x = -off; x < w; x += brickW) {
+        g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "0,0,0"},${0.02 + rnd() * 0.07})`;
+        g.fillRect(x + 1, y + 1, brickW - 2, rowH - 2);
+      }
+      g.fillStyle = st.mortar;
+      g.fillRect(0, y, w, 1.5);
+      for (let x = -off; x < w; x += brickW) g.fillRect(x, y, 1.5, rowH);
+    }
+    // crenellations: low merlons standing on the lip
+    const mW = w * 0.075, period = w * 0.18, mH = h * 0.075;
+    for (let k = -3; k <= 2; k++) {
+      const cxm = w * 0.5 + (k + 0.5) * period, mx = cxm - mW / 2, my = topY - mH;
+      const mg = g.createLinearGradient(0, my, 0, topY);
+      mg.addColorStop(0, st.light); mg.addColorStop(0.2, st.base); mg.addColorStop(1, st.dark);
+      g.fillStyle = mg; g.fillRect(mx, my, mW, mH + 2);
+      g.fillStyle = st.mortar; g.fillRect(mx, my + mH * 0.5, mW, 1.5); g.fillRect(mx + mW * 0.5, my, 1.5, mH * 0.5); g.fillRect(mx + mW * 0.25, my + mH * 0.5, 1.5, mH * 0.5);
+      g.fillStyle = st.light; roundRectPath(g, mx - 3, my - 5, mW + 6, 8, 3); g.fill();
+      g.fillStyle = "rgba(0,0,0,0.18)"; g.fillRect(mx + mW - 4, my + 3, 4, mH);
+    }
+    // lip (coping stone) along the whole wall
+    const lg = g.createLinearGradient(0, topY - h * 0.016, 0, topY + h * 0.012);
+    lg.addColorStop(0, st.light); lg.addColorStop(1, st.base);
+    g.fillStyle = lg; g.fillRect(0, topY - h * 0.012, w, h * 0.024);
+    g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(0, topY + h * 0.012, w, 3);
+    g.fillStyle = "rgba(255,255,255,0.35)"; g.fillRect(0, topY - h * 0.012, w, 2);
+    // walkway floor in perspective
+    const fl = g.createLinearGradient(0, faceBottom, 0, h);
+    fl.addColorStop(0, theme.floor[0]); fl.addColorStop(1, theme.floor[1]);
+    g.fillStyle = fl; g.fillRect(0, faceBottom, w, h - faceBottom);
+    g.strokeStyle = st.mortar; g.lineWidth = 1.5;
+    for (let k = -7; k <= 7; k++) { g.beginPath(); g.moveTo(w / 2 + k * w * 0.075, faceBottom); g.lineTo(w / 2 + k * w * 0.16, h); g.stroke(); }
+    for (let j = 1; j < 3; j++) { const y = faceBottom + (h - faceBottom) * (j / 3) ** 1.5; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+    g.fillStyle = "rgba(0,0,0,0.3)"; g.fillRect(0, faceBottom, w, 3);
+    // world flavour
+    if (worldId === 2) {
+      g.fillStyle = "#e0a066";
+      for (let x = w * 0.03; x < w; x += w * 0.06) { g.beginPath(); g.arc(x, topY + h * 0.022, 3, 0, Math.PI * 2); g.fill(); }
+    } else if (worldId === 3) {
+      g.strokeStyle = "rgba(120,240,255,0.75)"; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(0, topY + h * 0.018); g.lineTo(w, topY + h * 0.018); g.stroke();
+      g.strokeStyle = "rgba(120,240,255,0.25)"; g.lineWidth = 6;
+      g.beginPath(); g.moveTo(0, topY + h * 0.018); g.lineTo(w, topY + h * 0.018); g.stroke();
+    }
+  }
+
+  // ---- layer cache ------------------------------------------------------------
+  let layersCache = {};
+  function getLayers(worldId) {
+    const v = view;
+    const key = `${worldId}|${v.w}|${v.h}|${v.dpr}`;
+    let L = layersCache[worldId];
+    if (L && L.key === key) return L;
+    const mk = () => {
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.ceil(v.w * v.dpr));
+      c.height = Math.max(1, Math.ceil(v.h * v.dpr));
+      const g = c.getContext("2d");
+      g.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
+      return { c, g };
+    };
+    L = { key, sky: mk(), land: mk(), wall: mk() };
+    paintSky(L.sky.g, v.w, v.h, v.horizonY, worldId);
+    paintLand(L.land.g, v.w, v.h, v.horizonY, worldId);
+    paintWall(L.wall.g, v.w, v.h, v.horizonY, worldId);
+    // deterministic items for the animated bits
+    const rnd = mulberry32(worldId * 71 + 5);
+    L.clouds = [];
+    for (let i = 0; i < (worldId === 3 ? 3 : 6); i++) {
+      L.clouds.push({ x: rnd() * (v.w + 300), y: v.horizonY * (0.12 + rnd() * 0.6), s: v.h * (0.018 + rnd() * 0.02), speed: 0.004 + rnd() * 0.01, a: worldId === 3 ? 0.18 : (worldId === 2 ? 0.45 : 0.9) });
+    }
+    L.stars = [];
+    for (let i = 0; i < 80; i++) L.stars.push({ x: rnd() * v.w, y: rnd() * v.horizonY * 0.9, r: 0.6 + rnd() * 1.4, ph: rnd() * 6.28 });
+    layersCache[worldId] = L;
+    return L;
+  }
+
+  // Animated pieces that sit BEHIND the land layer
+  function paintDynamicBack(g, worldId, L, tm) {
+    const v = view, hy = v.horizonY;
+    if (worldId === 3) {
+      L.stars.forEach((s) => {
+        g.fillStyle = `rgba(255,255,255,${0.35 + 0.65 * (0.5 + 0.5 * Math.sin(tm / 600 + s.ph))})`;
+        g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI * 2); g.fill();
+      });
+      // floating crystal islands
+      [[0.46, 0.2, 1], [0.62, 0.34, 0.7], [0.36, 0.42, 0.55]].forEach(([fx, fy, sc], i) => {
+        const x = v.w * fx, y = hy * fy + Math.sin(tm / 1400 + i * 2) * 4, s = v.h * 0.05 * sc;
+        g.fillStyle = "#3b2a78"; g.beginPath(); g.moveTo(x - s, y); g.lineTo(x + s, y); g.lineTo(x + s * 0.2, y + s * 0.9); g.lineTo(x - s * 0.3, y + s * 0.7); g.closePath(); g.fill();
+        g.fillStyle = "#5fbf6a"; g.fillRect(x - s, y - s * 0.12, s * 2, s * 0.14);
+        g.fillStyle = i % 2 ? "#6ff0ff" : "#ff7be0";
+        g.beginPath(); g.moveTo(x - s * 0.2, y - s * 0.1); g.lineTo(x, y - s * 0.9); g.lineTo(x + s * 0.2, y - s * 0.1); g.closePath(); g.fill();
       });
     }
-    if (maxHp >= 3) {
-      ctx.fillStyle = "#ffd700";
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.95, -r * 0.5);
-      ctx.lineTo(-r * 0.78, -r * 0.82);
-      ctx.lineTo(-r * 0.62, -r * 0.55);
-      ctx.closePath();
-      ctx.fill();
+    L.clouds.forEach((c) => {
+      const x = ((c.x + tm * c.speed) % (v.w + 320)) - 160;
+      cloudShape(g, x, c.y, c.s, c.a);
+    });
+    if (worldId === 2) {
+      // slowly turning cogs on the horizon, half hidden by the land layer
+      [[0.16, 0.115, 11, 1], [0.44, 0.085, 9, -1.4], [0.70, 0.15, 14, 0.8], [0.93, 0.09, 9, -1.2]].forEach(([fx, rr, teeth, spd]) => {
+        drawCogShape(g, v.w * fx, hy + v.h * 0.012, v.h * rr, teeth, tm / 5000 * spd, "#b8703a", "#5b3318");
+      });
     }
   }
 
-  // Every monster in the game is a dragon walking left toward the castle:
-  // tail + back legs + wings drawn first (behind the body), then body, belly,
-  // front leg, neck/head, horns, special features, HP modifiers, and eye.
-  function drawDragon(ctx, size, cfg, isBlinking, wingFlap, legPhase, maxHp) {
-    const r = size / 2;
-    const legSwing = Math.sin(legPhase) * r * 0.18;
-    const tailWag = Math.sin(legPhase) * 3;
-
-    ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.32; ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(r * 0.5, r * 0.1);
-    ctx.quadraticCurveTo(r * 1.1, r * 0.3 + tailWag, r * 1.3, -r * 0.05 + tailWag);
-    ctx.stroke();
-
-    ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.26;
-    ctx.beginPath(); ctx.moveTo(r * 0.22, r * 0.5); ctx.lineTo(r * 0.22 + legSwing, r * 0.92); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-r * 0.28, r * 0.5); ctx.lineTo(-r * 0.28 - legSwing, r * 0.92); ctx.stroke();
-
-    drawDragonWings(ctx, r, cfg, wingFlap);
-
-    ctx.fillStyle = cfg.body;
-    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.72, r * 0.58, 0, 0, Math.PI * 2); ctx.fill();
-
-    ctx.fillStyle = cfg.belly;
-    ctx.beginPath(); ctx.ellipse(-r * 0.05, r * 0.2, r * 0.48, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
-
-    ctx.strokeStyle = cfg.body; ctx.lineWidth = r * 0.26;
-    ctx.beginPath(); ctx.moveTo(-r * 0.5, r * 0.4); ctx.lineTo(-r * 0.5 - legSwing, r * 0.85); ctx.stroke();
-
-    ctx.fillStyle = cfg.body;
-    ctx.beginPath(); ctx.ellipse(-r * 0.82, -r * 0.15, r * 0.38, r * 0.33, -0.15, 0, Math.PI * 2); ctx.fill();
-
-    ctx.beginPath(); ctx.ellipse(-r * 1.12, -r * 0.05, r * 0.18, r * 0.14, -0.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#2a2a2a";
-    ctx.beginPath(); ctx.arc(-r * 1.24, -r * 0.05, r * 0.03, 0, Math.PI * 2); ctx.fill();
-
-    drawDragonHorns(ctx, r, cfg);
-    drawDragonSpecialFeatures(ctx, r, cfg);
-    drawHpModifiers(ctx, r, maxHp);
-    drawDragonEye(ctx, -r * 0.78, -r * 0.22, r * 0.12, isBlinking);
+  // Animated pieces in FRONT of the land layer
+  function paintDynamicFront(g, worldId, L, tm) {
+    const v = view, hy = v.horizonY;
+    if (worldId === 1) {
+      const hx = v.w * 0.86, hyb = hy - v.h * 0.134, len = v.h * 0.062;
+      g.save(); g.translate(hx, hyb); g.rotate(tm / 2600);
+      for (let k = 0; k < 4; k++) {
+        g.rotate(Math.PI / 2);
+        g.fillStyle = "#f7f1e2"; g.fillRect(-len * 0.09, 0, len * 0.18, len);
+        g.fillStyle = "#c9b79a"; g.fillRect(-len * 0.09, 0, len * 0.04, len);
+      }
+      g.fillStyle = "#6b4a2b"; g.beginPath(); g.arc(0, 0, len * 0.1, 0, Math.PI * 2); g.fill();
+      g.restore();
+    } else if (worldId === 2) {
+      [[0.31, 0.10], [0.69, 0.14]].forEach(([fx, hh], i) => {
+        for (let k = 0; k < 5; k++) {
+          const age = ((tm / 3200) + k / 5 + i * 0.3) % 1;
+          g.fillStyle = `rgba(90,60,40,${0.4 * (1 - age)})`;
+          g.beginPath(); g.arc(v.w * fx + age * v.w * 0.04, hy - v.h * hh - age * v.h * 0.12, v.h * (0.008 + age * 0.02), 0, Math.PI * 2); g.fill();
+        }
+      });
+    }
   }
 
-  const BASE_MONSTER_SIZE = 46; // px "diameter" at scale 1, before per-monster/boss scale
-
-  function drawBossHpBar(ctx, m, size) {
-    const barWidth = size * 1.3;
-    const barHeight = 8;
-    const x = m.x - barWidth / 2;
-    const y = m.y - size * 0.9 - 16;
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
-    roundRectPath(ctx, x, y, barWidth, barHeight, 4); ctx.fill();
+  // =========================================================================
+  // MONSTER / CANNON DRAWING
+  // =========================================================================
+  function drawBossHpBar(g, m) {
+    const barWidth = Math.max(80, m.size * 0.9);
+    const barHeight = 10;
+    const x = m.sx - barWidth / 2;
+    const y = Math.max(78, m.sy - m.size * 0.5 - 16); // stays clear of the HUD pills
+    g.fillStyle = "rgba(0,0,0,0.55)";
+    roundRectPath(g, x - 2, y - 2, barWidth + 4, barHeight + 4, 6); g.fill();
     const hpFrac = Math.max(0, m.hp / m.maxHp);
-    ctx.fillStyle = "#e8590c";
-    roundRectPath(ctx, x, y, barWidth * hpFrac, barHeight, 4); ctx.fill();
-    ctx.font = "12px sans-serif";
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(`${m.hp}/${m.maxHp}`, m.x, y - 2);
+    const bg = g.createLinearGradient(0, y, 0, y + barHeight);
+    bg.addColorStop(0, "#ff9a3c"); bg.addColorStop(1, "#e8590c");
+    g.fillStyle = bg;
+    roundRectPath(g, x, y, Math.max(2, barWidth * hpFrac), barHeight, 5); g.fill();
+    g.font = "bold 13px 'Baloo 2', 'Trebuchet MS', sans-serif";
+    g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "bottom";
+    g.fillText(`${m.hp}/${m.maxHp}`, m.sx, y - 3);
   }
 
-  // Small HP pips above non-boss multi-HP dragons (armored/elite), separate
-  // from the full boss HP bar which shows a fraction + number instead.
-  function drawHpPips(ctx, m, size) {
-    const pipR = 4;
-    const spacing = 10;
-    const totalWidth = (m.maxHp - 1) * spacing;
-    const startX = m.x - totalWidth / 2;
-    const y = m.y - size * 0.7 - 10;
+  // Small HP pips above armored/elite dragons (the boss gets a full bar).
+  function drawHpPips(g, m) {
+    const pipR = Math.max(3, Math.min(6, m.size * 0.04));
+    const spacing = pipR * 2.6;
+    const startX = m.sx - ((m.maxHp - 1) * spacing) / 2;
+    const y = Math.max(66, m.sy - m.size * 0.5 - pipR * 2.5);
     for (let i = 0; i < m.maxHp; i++) {
-      ctx.beginPath();
-      ctx.arc(startX + i * spacing, y, pipR, 0, Math.PI * 2);
-      ctx.fillStyle = i < m.hp ? "#e8590c" : "rgba(0,0,0,0.25)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1; ctx.stroke();
+      g.beginPath();
+      g.arc(startX + i * spacing, y, pipR, 0, Math.PI * 2);
+      g.fillStyle = i < m.hp ? "#ff7a1a" : "rgba(0,0,0,0.35)";
+      g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.85)"; g.lineWidth = 1.2; g.stroke();
     }
   }
 
-  function drawMonster(ctx, m) {
-    const bob = Math.sin(Date.now() / 200 + m.bobOffset) * 4;
-    let alpha = 1, popScale = 1, squashX = 1, squashY = 1;
+  function drawMonster(g, m, tm) {
+    const cfg = DRAGON_SPECIES[m.speciesKey];
+    let alpha = m.alpha == null ? 1 : m.alpha, pop = 1;
     if (m.dying) {
-      const t2 = m.dieTimer / 300;
-      if (t2 < 0.25) {
-        const squashT = t2 / 0.25;
-        squashY = 1 - squashT * 0.35;
-        squashX = 1 + squashT * 0.25;
-      } else {
-        const popT = (t2 - 0.25) / 0.75;
-        popScale = 1 + popT * 0.6;
-        squashY = 0.65 + popT * 0.35;
-        squashX = 1.25 - popT * 0.25;
-        alpha = 1 - popT;
+      const k = Math.min(1, m.dieTimer / 360);
+      pop = 1 + k * 0.4;
+      alpha *= 1 - k;
+    }
+    if (alpha <= 0.01) return;
+    // ground shadow: smaller and fainter the higher the dragon flies
+    const hoverPx = m.hover * view.spriteBase * m.s;
+    const sa = 0.22 * alpha * (1 - Math.min(1, hoverPx / (view.h * 0.55)));
+    if (sa > 0.01) {
+      g.fillStyle = `rgba(0,0,0,${sa})`;
+      g.beginPath(); g.ellipse(m.sx, m.groundY, m.size * 0.5, m.size * 0.09, 0, 0, Math.PI * 2); g.fill();
+    }
+    const bob = Math.sin(tm / 260 + m.seed) * m.size * 0.025;
+    const roar = Math.min(1, Math.max(0, (m.p - 0.6) / 0.3));
+    const mouth = 0.3 + 0.18 * Math.sin(tm / 380 + m.seed) + 0.55 * roar;
+    const pulse = m.hitTimer > 0 ? 1 + (m.hitTimer / 180) * 0.1 : 1;
+    g.save();
+    g.globalAlpha = alpha;
+    g.translate(m.sx, m.sy + bob);
+    g.scale(pop * pulse, pop * pulse);
+    drawDragon(g, m.size, cfg, { time: tm, seed: m.seed, mouth, maxHp: m.maxHp, isBoss: m.isBoss });
+    if (m.hitTimer > 0) {
+      g.globalCompositeOperation = "lighter";
+      const rr = m.size * 0.6, fg = g.createRadialGradient(0, 0, 0, 0, 0, rr);
+      fg.addColorStop(0, `rgba(255,255,255,${0.7 * m.hitTimer / 180})`); fg.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = fg; g.beginPath(); g.arc(0, 0, rr, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+    if (!m.dying && !m.ambient) {
+      if (m.isBoss) drawBossHpBar(g, m);
+      else if (m.maxHp > 1) drawHpPips(g, m);
+    }
+  }
+
+  // Lock-on brackets around the dragons the cannons are about to fire at.
+  function drawReticle(g, m, color, tm) {
+    const rad = Math.max(16, m.size * 0.58);
+    g.save();
+    g.translate(m.sx, m.sy);
+    g.rotate(tm / 1400);
+    g.lineCap = "round";
+    for (let pass = 0; pass < 2; pass++) {
+      g.strokeStyle = pass ? color : color.replace(/[\d.]+\)$/, "0.25)");
+      g.lineWidth = pass ? Math.max(2, rad * 0.06) : Math.max(5, rad * 0.16);
+      for (let k = 0; k < 4; k++) {
+        g.beginPath(); g.arc(0, 0, rad, k * Math.PI / 2 + 0.22, k * Math.PI / 2 + Math.PI / 2 - 0.22); g.stroke();
       }
     }
-    const renderScale = (m.scale || 1) * popScale;
-    const size = BASE_MONSTER_SIZE * renderScale;
-    const blinkCycle = (Date.now() / 1000 + m.blinkOffset / 300) % 3.2;
-    const isBlinking = !m.dying && blinkCycle > 3.0;
-    const legPhase = Date.now() / 150 + m.bobOffset * 3;
-    const wingFlap = Math.sin(Date.now() / 220 + m.bobOffset * 1.3) * 0.5 + 0.5;
-    const cfg = DRAGON_SPECIES[m.speciesKey];
+    g.restore();
+  }
 
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.translate(m.x, m.y + bob);
-    ctx.scale(squashX, squashY);
-    drawDragon(ctx, size, cfg, isBlinking, wingFlap, legPhase, m.maxHp);
-    ctx.restore();
+  function drawCannon(g, pose, tm) {
+    const { x, baseY, bx, by, dx, dy, rb, rm, L, u } = pose;
+    const alpha = pose.i === 1 ? Math.min(1, state.cannonSpread * 1.6) : 1;
+    if (alpha <= 0.02) return;
+    const tier = state.cannonLevel;
+    g.save();
+    g.globalAlpha = alpha;
+    const wood1 = "#94622f", wood2 = "#5b3819", iron = "#26282e", edge = "#0d0e11";
+    g.lineJoin = "round";
 
-    if (m.isBoss && !m.dying) {
-      drawBossHpBar(ctx, m, size);
-    } else if (!m.dying && m.maxHp > 1) {
-      drawHpPips(ctx, m, size);
+    // wheels (seen edge-on from behind)
+    [-1, 1].forEach((s) => {
+      const wx = x + s * u * 0.86, wy = baseY - u * 0.34, rx = u * 0.15, ry = u * 0.56;
+      g.fillStyle = iron; g.beginPath(); g.ellipse(wx, wy, rx + u * 0.045, ry + u * 0.045, 0, 0, Math.PI * 2); g.fill();
+      const wg = g.createLinearGradient(wx - rx, 0, wx + rx, 0);
+      wg.addColorStop(0, wood2); wg.addColorStop(0.5, wood1); wg.addColorStop(1, wood2);
+      g.fillStyle = wg; g.beginPath(); g.ellipse(wx, wy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = iron; g.lineWidth = u * 0.04;
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 4;
+        g.beginPath(); g.moveTo(wx - Math.sin(a) * rx * 0.9, wy - Math.cos(a) * ry * 0.9); g.lineTo(wx + Math.sin(a) * rx * 0.9, wy + Math.cos(a) * ry * 0.9); g.stroke();
+      }
+      g.fillStyle = "#c9ced6"; g.beginPath(); g.arc(wx, wy, u * 0.05, 0, Math.PI * 2); g.fill();
+    });
+
+    // carriage body
+    const cg = g.createLinearGradient(0, by, 0, baseY);
+    cg.addColorStop(0, wood1); cg.addColorStop(1, wood2);
+    g.beginPath();
+    g.moveTo(x - u * 0.50, by + u * 0.08); g.lineTo(x + u * 0.50, by + u * 0.08);
+    g.lineTo(x + u * 0.82, baseY + 6); g.lineTo(x - u * 0.82, baseY + 6);
+    g.closePath();
+    g.fillStyle = cg; g.fill(); g.lineWidth = u * 0.03; g.strokeStyle = edge; g.stroke();
+    g.strokeStyle = "rgba(0,0,0,0.3)"; g.lineWidth = 1.5;
+    for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * u * 0.22, by + u * 0.1); g.lineTo(x + k * u * 0.36, baseY); g.stroke(); }
+    g.fillStyle = iron;
+    [0.38, 0.74].forEach((f) => {
+      const yy = by + (baseY - by) * f, hw = u * (0.5 + 0.32 * f);
+      g.fillRect(x - hw, yy, hw * 2, u * 0.07);
+    });
+    // trunnion cheeks flanking the breech
+    [-1, 1].forEach((s) => {
+      g.fillStyle = wood2; roundRectPath(g, x + s * rb * 1.02 - u * 0.09, by - u * 0.16, u * 0.18, u * 0.5, u * 0.05); g.fill();
+      g.lineWidth = u * 0.025; g.strokeStyle = edge; g.stroke();
+    });
+
+    // barrel: tapered tube from the breech toward the muzzle
+    const nx = -dy, ny = dx;
+    const Bx = bx, By = by, Mx = bx + dx * L, My = by + dy * L;
+    g.beginPath();
+    g.moveTo(Bx + nx * rb, By + ny * rb); g.lineTo(Mx + nx * rm, My + ny * rm);
+    g.lineTo(Mx - nx * rm, My - ny * rm); g.lineTo(Bx - nx * rb, By - ny * rb);
+    g.closePath();
+    const bg = g.createLinearGradient(Bx - nx * rb, By - ny * rb, Bx + nx * rb, By + ny * rb);
+    bg.addColorStop(0, "#1b1d22"); bg.addColorStop(0.28, "#59606b"); bg.addColorStop(0.46, "#98a0ac");
+    bg.addColorStop(0.7, "#3b3f48"); bg.addColorStop(1, "#15161a");
+    g.fillStyle = bg; g.fill(); g.lineWidth = u * 0.03; g.strokeStyle = edge; g.stroke();
+    // reinforcing bands (gold once the cannon is upgraded)
+    [0.3, 0.62].forEach((f) => {
+      const r0 = rb + (rm - rb) * f, px = Bx + dx * L * f, py = By + dy * L * f, th = L * 0.08;
+      g.beginPath();
+      g.moveTo(px + nx * r0 * 1.06, py + ny * r0 * 1.06); g.lineTo(px + dx * th + nx * r0 * 1.06, py + dy * th + ny * r0 * 1.06);
+      g.lineTo(px + dx * th - nx * r0 * 1.06, py + dy * th - ny * r0 * 1.06); g.lineTo(px - nx * r0 * 1.06, py - ny * r0 * 1.06);
+      g.closePath();
+      g.fillStyle = tier >= 1 ? "#f2c14e" : "#3b3e46"; g.fill(); g.lineWidth = u * 0.022; g.strokeStyle = edge; g.stroke();
+    });
+    // muzzle swell
+    const mth = L * 0.12;
+    g.beginPath();
+    g.moveTo(Mx + nx * rm * 1.16, My + ny * rm * 1.16); g.lineTo(Mx - nx * rm * 1.16, My - ny * rm * 1.16);
+    g.lineTo(Mx - dx * mth - nx * rm * 1.02, My - dy * mth - ny * rm * 1.02); g.lineTo(Mx - dx * mth + nx * rm * 1.02, My - dy * mth + ny * rm * 1.02);
+    g.closePath();
+    g.fillStyle = tier >= 1 ? "#d9a63a" : "#2d3037"; g.fill(); g.lineWidth = u * 0.025; g.strokeStyle = edge; g.stroke();
+    // breech: the round rear face you look at
+    const rg = g.createRadialGradient(Bx - rb * 0.3, By - rb * 0.3, rb * 0.1, Bx, By, rb * 1.1);
+    rg.addColorStop(0, "#a4acb8"); rg.addColorStop(0.55, "#4a5059"); rg.addColorStop(1, "#1a1c21");
+    g.fillStyle = rg; g.beginPath(); g.arc(Bx, By, rb * 1.08, 0, Math.PI * 2); g.fill();
+    g.lineWidth = u * 0.03; g.strokeStyle = edge; g.stroke();
+    g.strokeStyle = tier >= 1 ? "#f2c14e" : "#6d747f"; g.lineWidth = u * 0.03;
+    g.beginPath(); g.arc(Bx, By, rb * 0.72, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = "#2a2d33"; g.beginPath(); g.arc(Bx, By, rb * 0.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.35)"; g.beginPath(); g.arc(Bx - rb * 0.1, By - rb * 0.12, rb * 0.1, 0, Math.PI * 2); g.fill();
+
+    // muzzle flash
+    if (state.muzzleFlash > 0.02) {
+      const f = state.muzzleFlash, fr = u * (0.5 + 0.7 * f);
+      g.globalCompositeOperation = "lighter";
+      const fg = g.createRadialGradient(Mx, My, 0, Mx, My, fr);
+      fg.addColorStop(0, `rgba(255,250,210,${0.95 * f})`); fg.addColorStop(0.35, `rgba(255,190,70,${0.7 * f})`); fg.addColorStop(1, "rgba(255,120,30,0)");
+      g.fillStyle = fg; g.beginPath(); g.arc(Mx, My, fr, 0, Math.PI * 2); g.fill();
+      g.fillStyle = `rgba(255,240,170,${0.8 * f})`;
+      g.beginPath();
+      for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8 + tm / 90, rr = k % 2 ? fr * 0.35 : fr * 0.9; g.lineTo(Mx + Math.cos(a) * rr, My + Math.sin(a) * rr); }
+      g.closePath(); g.fill();
     }
+    g.restore();
+  }
+
+  function sceneWorldId() {
+    if (state.mode === "menu") return menuWorldId;
+    if (state.mode === "quiz") return state.quickUnlockWorldId || 1;
+    return currentWorld().id;
+  }
+
+  // ---- ambient dragons drifting in the sky behind the menus -----------------
+  let menuWorldId = 1;
+  let ambient = [];
+  function resetAmbient() {
+    ambient = [];
+    const list = DRAGON_SPECIES_BY_WORLD[menuWorldId];
+    [[-0.78, 0.7, 0.10], [0.72, 0.35, 0.22], [-0.25, 0.9, 0.34], [0.3, 0.55, 0.44]].forEach(([lane, hover, p0], i) => {
+      const m = {
+        p: p0, speedP: 0.00028 + i * 0.00004, lane, hover, speciesKey: list[i % list.length], scale: 1,
+        hp: 1, maxHp: 1, isBoss: false, dying: false, dieTimer: 0, hitTimer: 0, seed: i * 7.3, ambient: true, alpha: 1,
+      };
+      layoutMonster(m);
+      ambient.push(m);
+    });
+  }
+  function updateAmbient(dt) {
+    ambient.forEach((m) => {
+      m.p += m.speedP * (dt / 16.6667);
+      if (m.p > 0.5) m.p = 0.02;
+      m.alpha = Math.min(1, m.p / 0.06) * Math.min(1, (0.5 - m.p) / 0.08);
+      layoutMonster(m);
+    });
   }
 
   function render() {
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width, h = rect.height;
-    ctx2d.clearRect(0, 0, w, h);
+    const g = ctx2d, v = view, w = v.w, h = v.h;
+    const tm = frameTime;
+    g.clearRect(0, 0, w, h);
+    const worldId = sceneWorldId();
+    const L = getLayers(worldId);
+    const playing = state.mode === "playing";
 
-    // background sky
-    const grad = ctx2d.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "#bfe6f5");
-    grad.addColorStop(1, "#d9f2c4");
-    ctx2d.fillStyle = grad;
-    ctx2d.fillRect(0, 0, w, h);
-
-    // ground strip
-    ctx2d.fillStyle = "#8fbf5f";
-    ctx2d.fillRect(0, h * 0.75, w, h * 0.25);
-
-    // castle + cannon(s) — main cannon aims at the most urgent alive dragon
-    // (shortest time-to-castle); the second cannon (10-answer streak) aims at
-    // the next most urgent, matching whatever fireAtClosestMonster() targets.
-    drawCastle(ctx2d, rect);
-    const barrelScale = state.cannonLevel >= 1 ? BALANCE.CANNON_TIER1_BARREL_SCALE : 1;
-    const aliveSorted = sortByThreat(state.monsters.filter(m => !m.dying));
-    const muzzle = getCannonMuzzle(rect);
-    let aimAngle = 0;
-    if (aliveSorted[0]) {
-      aimAngle = Math.atan2(aliveSorted[0].y - muzzle.y, aliveSorted[0].x - muzzle.x);
+    g.save();
+    if (state.shake > 0) {
+      const k = state.shake * state.shake;
+      g.translate((Math.random() - 0.5) * 18 * k, (Math.random() - 0.5) * 18 * k);
     }
-    drawCannon(ctx2d, muzzle, aimAngle, state.cannonRecoil, barrelScale);
-    if (state.cannonLevel >= 2) {
-      const muzzle2 = getSecondCannonMuzzle(rect);
-      const target2 = aliveSorted[1] || aliveSorted[0];
-      let aimAngle2 = 0;
-      if (target2) aimAngle2 = Math.atan2(target2.y - muzzle2.y, target2.x - muzzle2.x);
-      drawCannon(ctx2d, muzzle2, aimAngle2, state.cannonRecoil, barrelScale);
+    g.drawImage(L.sky.c, 0, 0, w, h);
+    paintDynamicBack(g, worldId, L, tm);
+    g.drawImage(L.land.c, 0, 0, w, h);
+    paintDynamicFront(g, worldId, L, tm);
+
+    // dragons, far to near
+    const list = state.mode === "menu" ? ambient : (playing ? state.monsters : []);
+    const sorted = list.slice().sort((a, b) => a.s - b.s);
+    for (const m of sorted) drawMonster(g, m, tm);
+
+    // which dragons the cannons are aiming at (shortest time-to-wall first)
+    const aliveSorted = playing ? sortByThreat(state.monsters.filter(m => !m.dying)) : [];
+    if (state.running && aliveSorted[0]) {
+      drawReticle(g, aliveSorted[0], "rgba(255,214,77,0.95)", tm);
+      if (state.cannonLevel >= 2 && aliveSorted[1]) drawReticle(g, aliveSorted[1], "rgba(120,235,255,0.95)", tm);
     }
 
-    // monsters
-    for (const m of state.monsters) {
-      drawMonster(ctx2d, m);
-    }
-
-    // cannonballs (arc up then back down toward the target using a sine offset)
-    for (const ball of state.cannonballs) {
-      const dx = ball.target.x - ball.x;
-      const dy = ball.target.y - ball.y;
-      const remainingDist = Math.sqrt(dx * dx + dy * dy);
-      const progress = Math.min(1, Math.max(0, 1 - remainingDist / ball.initialDist));
-      const arcHeight = Math.sin(progress * Math.PI) * BALANCE.CANNONBALL_ARC_HEIGHT;
-      ctx2d.save();
-      ctx2d.translate(ball.x, ball.y - arcHeight);
-      ctx2d.rotate(ball.rotation);
-      ctx2d.fillStyle = "#2b2b2b";
-      ctx2d.beginPath();
-      ctx2d.arc(0, 0, 9, 0, Math.PI * 2);
-      ctx2d.fill();
-      ctx2d.fillStyle = "rgba(255,255,255,0.25)";
-      ctx2d.beginPath();
-      ctx2d.arc(-3, -3, 3, 0, Math.PI * 2);
-      ctx2d.fill();
-      ctx2d.restore();
-    }
-
-    // particles
-    for (const p of state.particles) {
-      ctx2d.globalAlpha = Math.max(0, p.life / 30);
-      ctx2d.fillStyle = p.color;
-      ctx2d.beginPath();
-      ctx2d.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx2d.fill();
-    }
-    ctx2d.globalAlpha = 1;
-
-    // confetti
-    for (const c of confetti) {
-      ctx2d.save();
-      ctx2d.translate(c.x, c.y);
-      ctx2d.rotate(c.rot);
-      ctx2d.fillStyle = c.color;
-      ctx2d.fillRect(-c.size / 2, -c.size / 2, c.size, c.size);
-      ctx2d.restore();
-    }
-  }
-
-  function loop(timestamp) {
-    if (!state.lastFrameTime) state.lastFrameTime = timestamp;
-    const dt = timestamp - state.lastFrameTime;
-    state.lastFrameTime = timestamp;
-
-    if (state.running) {
-      update(dt);
-    }
-    if (confetti.length > 0 && !state.running) {
-      // keep animating confetti after game ends
-      const rect = canvas.getBoundingClientRect();
-      for (const c of confetti) {
-        c.y += c.vy * (dt / 16.6667);
-        c.x += c.vx * (dt / 16.6667);
-        c.rot += c.vrot;
-        if (c.y > rect.height + 20) { c.y = -20; c.x = Math.random() * rect.width; }
+    // cannonballs shrink as they fly away from you
+    if (playing) {
+      for (const b of state.cannonballs) {
+        const rem = Math.hypot(b.target.sx - b.x, b.target.sy - b.y);
+        const prog = Math.min(1, Math.max(0, 1 - rem / b.initialDist));
+        const endR = Math.max(3, b.target.size * 0.045);
+        const rad = b.startR + (endR - b.startR) * prog;
+        g.globalCompositeOperation = "lighter";
+        b.trail.forEach((p, k) => {
+          const a = (k + 1) / (b.trail.length + 1);
+          g.fillStyle = `rgba(255,${150 + 60 * a | 0},60,${0.35 * a})`;
+          g.beginPath(); g.arc(p.x, p.y, p.r * (0.5 + 0.5 * a), 0, Math.PI * 2); g.fill();
+        });
+        g.globalCompositeOperation = "source-over";
+        g.fillStyle = "#23252b"; g.beginPath(); g.arc(b.x, b.y, rad, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "rgba(255,255,255,0.35)"; g.beginPath(); g.arc(b.x - rad * 0.3, b.y - rad * 0.3, rad * 0.32, 0, Math.PI * 2); g.fill();
       }
     }
-    render();
-    requestAnimationFrame(loop);
+
+    g.drawImage(L.wall.c, 0, 0, w, h);
+
+    // cannons stand in front of the wall
+    drawCannon(g, cannonPose(0, aliveSorted[0] || null), tm);
+    if (state.cannonSpread > 0.02) drawCannon(g, cannonPose(1, aliveSorted[1] || aliveSorted[0] || null), tm);
+
+    // particles (hits, smoke, popups, rings)
+    if (playing) {
+      for (const p of state.particles) {
+        const a = Math.max(0, p.life / p.maxLife);
+        if (p.text) {
+          g.globalAlpha = Math.min(1, a * 1.6);
+          g.font = "800 22px 'Baloo 2', 'Trebuchet MS', sans-serif";
+          g.textAlign = "center"; g.textBaseline = "middle";
+          g.lineWidth = 4; g.strokeStyle = "rgba(60,30,0,0.8)"; g.strokeText(p.text, p.x, p.y);
+          g.fillStyle = p.color; g.fillText(p.text, p.x, p.y);
+        } else if (p.ring) {
+          g.globalAlpha = a; g.strokeStyle = p.color; g.lineWidth = 3 + 4 * a;
+          g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.stroke();
+        } else if (p.smoke) {
+          g.globalAlpha = a * 0.6; g.fillStyle = p.color;
+          g.beginPath(); g.arc(p.x, p.y, p.r * (1.6 - a * 0.6), 0, Math.PI * 2); g.fill();
+        } else {
+          g.globalAlpha = a; g.fillStyle = p.color;
+          g.beginPath(); g.arc(p.x, p.y, p.r * (0.4 + 0.6 * a), 0, Math.PI * 2); g.fill();
+        }
+      }
+      g.globalAlpha = 1;
+    }
+    g.restore();
+
+    // screen-space moods: damage flash + boss-wave vignette
+    if (playing && (state.flash > 0.01 || state.isBossWave)) {
+      const fa = Math.max(state.flash * 0.6, state.isBossWave ? 0.16 + 0.07 * Math.sin(tm / 380) : 0);
+      const vg = g.createRadialGradient(w / 2, h * 0.55, Math.min(w, h) * 0.25, w / 2, h * 0.55, Math.max(w, h) * 0.75);
+      vg.addColorStop(0, "rgba(255,30,30,0)"); vg.addColorStop(1, `rgba(${state.flash > 0.01 ? "255,30,30" : "120,0,30"},${fa})`);
+      g.fillStyle = vg; g.fillRect(0, 0, w, h);
+    }
+
+    // confetti (celebration): not affected by shake
+    for (const c of confetti) {
+      g.save();
+      g.translate(c.x, c.y);
+      g.rotate(c.rot);
+      g.fillStyle = c.color;
+      g.fillRect(-c.size / 2, -c.size / 2, c.size, c.size);
+      g.restore();
+    }
   }
 
   // =========================================================================
@@ -2216,6 +3278,11 @@
     state.monsters = [];
     state.cannonballs = [];
     state.cannonRecoil = 0;
+    state.muzzleFlash = 0;
+    state.shake = 0;
+    state.flash = 0;
+    state.cannonSpread = 0;
+    state.laneBag = [];
     state.particles = [];
     state.difficultyIndex = 0;
     state.correctStreak = 0;
@@ -2242,6 +3309,11 @@
   }
 
   window.addEventListener("resize", resizeCanvas);
+  // The canvas height changes whenever the panel below it does, which no
+  // window event reports; observe the wrapper directly.
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(resizeCanvas).observe(document.getElementById("canvasWrapper"));
+  }
   window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 100));
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", resizeCanvas);
